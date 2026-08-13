@@ -3,7 +3,7 @@ const questionInput = document.getElementById("question");
 const answerBox = document.getElementById("answer");
 
 // Replace this with your ngrok URL if it changes
-const API_URL = "https://reclusive-undertow-unlit.ngrok-free.dev/ask";
+const API_URL = "https://ai-pocket-scientist.onrender.com/ask";
 
 askButton.addEventListener("click", askAI);
 
