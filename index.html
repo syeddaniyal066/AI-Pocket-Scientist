@@ -2,7 +2,6 @@
 <html lang="en">
 
 <head>
-
     <meta charset="UTF-8">
 
     <meta
@@ -16,30 +15,23 @@
         rel="stylesheet"
         href="style.css"
     >
-
 </head>
 
 <body>
 
     <div class="app-layout">
 
-
-        <!-- ========================================= -->
-        <!-- LEFT SIDE -->
-        <!-- ========================================= -->
+        <!-- =========================
+             LEFT SIDE
+        ========================== -->
 
         <div class="main-panel">
 
-            <h1>
-                🤖 AI Pocket Scientist
-            </h1>
+            <h1>🤖 AI Pocket Scientist</h1>
 
             <p class="subtitle">
                 Your intelligent science assistant
             </p>
-
-
-            <!-- QUESTION -->
 
             <input
                 type="text"
@@ -47,15 +39,9 @@
                 placeholder="Ask me anything..."
             >
 
-
-            <!-- ASK BUTTON -->
-
             <button id="askButton">
                 Ask AI
             </button>
-
-
-            <!-- ANSWER -->
 
             <div id="answer">
                 Your answer will appear here...
@@ -64,56 +50,99 @@
         </div>
 
 
-
-        <!-- ========================================= -->
-        <!-- RIGHT IMAGE PANEL -->
-        <!-- ========================================= -->
+        <!-- =========================
+             RIGHT SIDE
+        ========================== -->
 
         <div class="image-panel">
 
-
-            <!-- IMAGE BUTTON -->
-
-            <button id="imageButton">
-
+            <button id="cameraButton">
                 📷 Click Image
-
             </button>
 
 
-            <!-- HIDDEN FILE INPUT -->
+            <!-- Hidden normal file picker -->
 
             <input
                 type="file"
                 id="imageInput"
                 accept="image/*"
-                capture="environment"
                 hidden
             >
 
 
-            <!-- IMAGE PREVIEW AREA -->
+            <!-- IMAGE / CAMERA AREA -->
 
-            <div class="preview-box">
+            <div id="dropZone" class="preview-box">
 
-                <div
-                    id="previewText"
-                    class="preview-placeholder"
-                >
-                    Image Preview
+                <!-- Default message -->
+
+                <div id="placeholder" class="placeholder">
+
+                    <div class="drop-icon">
+                        🖼️
+                    </div>
+
+                    <div>
+                        Drop image here
+                    </div>
+
+                    <div class="small-text">
+                        or click here to choose image
+                    </div>
+
                 </div>
 
 
+                <!-- Live camera -->
+
+                <video
+                    id="cameraVideo"
+                    autoplay
+                    playsinline
+                ></video>
+
+
+                <!-- Selected / captured image -->
+
                 <img
                     id="previewImage"
-                    src=""
-                    alt="Selected image"
+                    alt="Image preview"
                 >
 
             </div>
 
-        </div>
 
+            <!-- CAMERA CONTROLS -->
+
+            <div
+                id="cameraControls"
+                class="camera-controls"
+            >
+
+                <button id="takePhotoButton">
+                    📸 Take Photo
+                </button>
+
+                <button id="cancelCameraButton">
+                    ✖ Cancel
+                </button>
+
+            </div>
+
+
+            <!-- REMOVE IMAGE -->
+
+            <button id="removeImageButton">
+                🗑 Remove Image
+            </button>
+
+
+            <!-- Used internally to capture camera frame -->
+
+            <canvas id="cameraCanvas"></canvas>
+
+        </div>
 
     </div>
 

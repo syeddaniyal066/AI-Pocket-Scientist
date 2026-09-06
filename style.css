@@ -1,10 +1,11 @@
 /* =========================================
-   PAGE
+   GENERAL
 ========================================= */
 
 * {
     box-sizing: border-box;
 }
+
 
 body {
 
@@ -26,12 +27,13 @@ body {
     align-items: center;
 
     padding: 30px;
+
 }
 
 
 
 /* =========================================
-   COMPLETE APP
+   APP LAYOUT
 ========================================= */
 
 .app-layout {
@@ -42,7 +44,7 @@ body {
 
     display: grid;
 
-    grid-template-columns: 1.45fr 0.8fr;
+    grid-template-columns: 1.5fr 0.8fr;
 
     gap: 25px;
 
@@ -73,11 +75,6 @@ body {
 }
 
 
-
-/* =========================================
-   TITLE
-========================================= */
-
 h1 {
 
     color: white;
@@ -89,7 +86,6 @@ h1 {
     text-align: center;
 
 }
-
 
 
 .subtitle {
@@ -107,7 +103,7 @@ h1 {
 
 
 /* =========================================
-   QUESTION INPUT
+   QUESTION
 ========================================= */
 
 #question {
@@ -153,13 +149,11 @@ h1 {
 }
 
 
-
 #askButton:hover {
 
     background: #1d4ed8;
 
 }
-
 
 
 #askButton:disabled {
@@ -173,7 +167,7 @@ h1 {
 
 
 /* =========================================
-   ANSWER BOX
+   ANSWER
 ========================================= */
 
 #answer {
@@ -201,7 +195,7 @@ h1 {
 
 
 /* =========================================
-   RIGHT IMAGE PANEL
+   IMAGE PANEL
 ========================================= */
 
 .image-panel {
@@ -225,10 +219,10 @@ h1 {
 
 
 /* =========================================
-   CLICK IMAGE BUTTON
+   CAMERA BUTTON
 ========================================= */
 
-#imageButton {
+#cameraButton {
 
     width: 75%;
 
@@ -242,19 +236,16 @@ h1 {
 
     color: white;
 
-    font-size: 22px;
+    font-size: 21px;
 
     cursor: pointer;
 
-    margin-top: 25px;
-
-    margin-bottom: 35px;
+    margin-bottom: 30px;
 
 }
 
 
-
-#imageButton:hover {
+#cameraButton:hover {
 
     background: #1d4ed8;
 
@@ -263,18 +254,24 @@ h1 {
 
 
 /* =========================================
-   IMAGE PREVIEW CONTAINER
+   PREVIEW / DROP AREA
 ========================================= */
 
 .preview-box {
 
     width: 100%;
 
-    height: 470px;
+    height: 440px;
 
     background: #334155;
 
     border-radius: 25px;
+
+    border: 3px dashed #64748b;
+
+    position: relative;
+
+    overflow: hidden;
 
     display: flex;
 
@@ -282,9 +279,25 @@ h1 {
 
     align-items: center;
 
-    overflow: hidden;
+    cursor: pointer;
 
-    position: relative;
+    transition: 0.2s;
+
+}
+
+
+.preview-box:hover {
+
+    border-color: #60a5fa;
+
+}
+
+
+.preview-box.dragging {
+
+    border-color: #3b82f6;
+
+    transform: scale(1.01);
 
 }
 
@@ -294,20 +307,38 @@ h1 {
    PLACEHOLDER
 ========================================= */
 
-.preview-placeholder {
+.placeholder {
+
+    color: #cbd5e1;
+
+    text-align: center;
+
+    font-size: 23px;
+
+    line-height: 1.8;
+
+}
+
+
+.drop-icon {
+
+    font-size: 50px;
+
+}
+
+
+.small-text {
+
+    font-size: 16px;
 
     color: #94a3b8;
-
-    font-size: 24px;
-
-    position: absolute;
 
 }
 
 
 
 /* =========================================
-   REAL IMAGE
+   IMAGE
 ========================================= */
 
 #previewImage {
@@ -320,16 +351,121 @@ h1 {
 
     display: none;
 
-    position: relative;
+}
 
-    z-index: 2;
+
+
+/* =========================================
+   CAMERA VIDEO
+========================================= */
+
+#cameraVideo {
+
+    width: 100%;
+
+    height: 100%;
+
+    object-fit: cover;
+
+    display: none;
 
 }
 
 
 
 /* =========================================
-   MOBILE
+   CAMERA CONTROLS
+========================================= */
+
+.camera-controls {
+
+    width: 100%;
+
+    display: none;
+
+    gap: 12px;
+
+    margin-top: 18px;
+
+}
+
+
+.camera-controls button {
+
+    flex: 1;
+
+    border: none;
+
+    border-radius: 12px;
+
+    padding: 14px;
+
+    color: white;
+
+    font-size: 17px;
+
+    cursor: pointer;
+
+}
+
+
+#takePhotoButton {
+
+    background: #2563eb;
+
+}
+
+
+#cancelCameraButton {
+
+    background: #475569;
+
+}
+
+
+
+/* =========================================
+   REMOVE IMAGE
+========================================= */
+
+#removeImageButton {
+
+    display: none;
+
+    margin-top: 18px;
+
+    border: none;
+
+    border-radius: 12px;
+
+    padding: 12px 25px;
+
+    background: #475569;
+
+    color: white;
+
+    font-size: 16px;
+
+    cursor: pointer;
+
+}
+
+
+
+/* =========================================
+   HIDDEN CANVAS
+========================================= */
+
+#cameraCanvas {
+
+    display: none;
+
+}
+
+
+
+/* =========================================
+   MOBILE / TABLET
 ========================================= */
 
 @media (max-width: 850px) {
@@ -378,7 +514,14 @@ h1 {
 
     .preview-box {
 
-        height: 350px;
+        height: 360px;
+
+    }
+
+
+    #cameraButton {
+
+        width: 100%;
 
     }
 
