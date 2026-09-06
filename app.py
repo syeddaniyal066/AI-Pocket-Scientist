@@ -1,31 +1,19 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
-from dotenv import load_dotenv
-from perplexity import Perplexity
-from groq import Groq
+from research import research_question
+from summarizer import summarize_research
 
-import re
 
-# ============================
-# Load Environment Variables
-# ============================
-
-load_dotenv()
-
-# ============================
-# AI Clients
-# ============================
-
-perplexity_client = Perplexity()
-groq_client = Groq()
-
-# ============================
-# Flask App
-# ============================
+# ======================================================
+# CREATE FLASK APP
+# ======================================================
 
 app = Flask(__name__)
 
+
+# Allow Netlify / browser to communicate
+# with the Render backend.
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
@@ -33,143 +21,149 @@ CORS(
     methods=["GET", "POST", "OPTIONS"]
 )
 
-app.config["CORS_HEADERS"] = "Content-Type"
 
-# ============================
-# Prompt Builder
-# ============================
-
-def build_prompt(question):
-
-    return f"""
-You are AI Pocket Scientist.
-
-RULES:
-- Maximum 25 words.
-- Exactly 2 sentences.
-- No lists.
-- No headings.
-- No markdown.
-- No bullet points.
-- No introduction.
-- Stop immediately after the second sentence.
-- Answer in simple language for school students.
-
-Question:
-{question}
-"""
-
-# ============================
-# Perplexity
-# ============================
-
-def ask_perplexity(question):
-
-    prompt = build_prompt(question)
-
-    response = perplexity_client.chat.completions.create(
-        model="sonar",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    answer = response.choices[0].message.content
-
-    # Remove citation numbers like [1][2]
-    answer = re.sub(r"\[\d+\]", "", answer)
-
-    answer = answer.strip()
-
-    return answer
-
-# ============================
-# Groq
-# ============================
-
-def ask_groq(question):
-
-    prompt = build_prompt(question)
-
-    response = groq_client.chat.completions.create(
-        model="llama-3.3-70b-versatile",
-        messages=[
-            {
-                "role": "user",
-                "content": prompt
-            }
-        ]
-    )
-
-    return response.choices[0].message.content.strip()
-
-# ============================
-# Home
-# ============================
+# ======================================================
+# HOME PAGE
+# ======================================================
 
 @app.route("/")
 def home():
 
     return "AI Pocket Scientist Server Running!"
 
-# ============================
-# Ask AI
-# ============================
+
+# ======================================================
+# ASK ENDPOINT
+# ======================================================
 
 @app.route("/ask", methods=["POST"])
 def ask():
 
     try:
 
+        # ----------------------------------------------
+        # GET QUESTION FROM JAVASCRIPT
+        # ----------------------------------------------
+
         data = request.get_json()
 
-        if not data:
-            return jsonify({"answer": "No JSON received."}), 400
 
-        question = data.get("question", "").strip()
+        if not data:
+
+            return jsonify(
+                {
+                    "answer": "No question received."
+                }
+            ), 400
+
+
+        question = data.get(
+            "question",
+            ""
+        ).strip()
+
 
         if question == "":
-            return jsonify({"answer": "Please enter a question."}), 400
 
-        # Try Perplexity first
-        try:
+            return jsonify(
+                {
+                    "answer":
+                    "Please enter a question."
+                }
+            ), 400
 
-            answer = ask_perplexity(question)
 
-            return jsonify({
-                "answer": answer,
-                "model": "Perplexity"
-            })
+        print("\n=================================")
+        print("QUESTION:")
+        print(question)
+        print("=================================")
 
-        except Exception as e:
 
-            print("Perplexity Error:", e)
+        # ==============================================
+        # STEP 1
+        # SEARCH REAL WEBSITES
+        # ==============================================
 
-            # Fallback to Groq
+        research_results = research_question(
+            question
+        )
 
-            answer = ask_groq(question)
 
-            return jsonify({
-                "answer": answer,
-                "model": "Groq"
-            })
+        # Nothing useful found
+        if not research_results:
 
-    except Exception as e:
+            return jsonify(
+                {
+                    "answer":
+                    "I could not find enough reliable information for that question."
+                }
+            )
 
-        print(e)
 
-        return jsonify({
-            "answer": "Something went wrong."
-        }), 500
+        print(
+            "\nResearch websites found:",
+            len(research_results)
+        )
 
-# ============================
-# Run Server
-# ============================
+
+        # ==============================================
+        # STEP 2
+        # OUR OWN SUMMARIZER
+        # ==============================================
+
+        summary = summarize_research(
+            research_results,
+            question,
+            3
+        )
+
+
+        print("\n3-LINE SUMMARY:")
+        print(summary)
+
+
+        # ==============================================
+        # STEP 3
+        # SEND RESULT TO WEBSITE
+        # ==============================================
+
+        sources = [
+            item["url"]
+            for item in research_results
+        ]
+
+
+        return jsonify(
+            {
+                "answer": summary,
+                "sources": sources,
+                "system": "AI Pocket Scientist Research Engine"
+            }
+        )
+
+
+    except Exception as error:
+
+        print(
+            "SERVER ERROR:",
+            error
+        )
+
+
+        return jsonify(
+            {
+                "answer":
+                "Something went wrong while researching your question."
+            }
+        ), 500
+
+
+# ======================================================
+# RUN LOCALLY
+# ======================================================
 
 if __name__ == "__main__":
 
-    app.run(debug=True)
-
+    app.run(
+        debug=True
+    )
