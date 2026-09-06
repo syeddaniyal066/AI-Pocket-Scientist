@@ -1,88 +1,314 @@
 // ======================================================
 // AI POCKET SCIENTIST
+//
 // STEP 0:
-// Camera / Upload / Drag & Drop → Base64
+// Camera / Upload / Drag & Drop
+// Image → Base64
+//
+// STEP 0.5:
+// Local MobileNet Vision
+//
+// STEP 1:
+// Backend researches websites
+//
+// STEP 2:
+// Python summarizer
+//
+// STEP 3:
+// Show answer
 // ======================================================
 
 
-// ------------------------------------------------------
+
+// ======================================================
 // HTML ELEMENTS
-// ------------------------------------------------------
+// ======================================================
 
 const askButton =
     document.getElementById("askButton");
 
+
 const questionInput =
     document.getElementById("question");
+
 
 const answerBox =
     document.getElementById("answer");
 
 
+
 const cameraButton =
     document.getElementById("cameraButton");
+
 
 const imageInput =
     document.getElementById("imageInput");
 
+
 const dropZone =
     document.getElementById("dropZone");
 
+
 const placeholder =
     document.getElementById("placeholder");
+
 
 const previewImage =
     document.getElementById("previewImage");
 
 
+
 const cameraVideo =
     document.getElementById("cameraVideo");
+
 
 const cameraControls =
     document.getElementById("cameraControls");
 
+
 const takePhotoButton =
     document.getElementById("takePhotoButton");
+
 
 const cancelCameraButton =
     document.getElementById("cancelCameraButton");
 
+
 const removeImageButton =
     document.getElementById("removeImageButton");
+
 
 const cameraCanvas =
     document.getElementById("cameraCanvas");
 
 
 
-// ------------------------------------------------------
-// BACKEND
-// ------------------------------------------------------
+// ======================================================
+// RENDER BACKEND
+// ======================================================
 
 const API_URL =
     "https://ai-pocket-scientist.onrender.com/ask";
 
 
 
-// ------------------------------------------------------
+// ======================================================
 // VARIABLES
-// ------------------------------------------------------
+// ======================================================
 
+
+// Prevent multiple requests
 let isThinking = false;
 
 
-// This stores the Base64 image.
-// Empty string = no image selected.
+// Full Base64 version of image
 let selectedImageBase64 = "";
 
 
-// Stores the live camera connection.
+// Camera stream
 let cameraStream = null;
+
+
+// MobileNet vision model
+let visionModel = null;
 
 
 
 // ======================================================
-// ASK AI
+// LOAD VISION MODEL
+// ======================================================
+
+async function loadVisionModel() {
+
+
+    // Already loaded
+    if (visionModel) {
+
+        return visionModel;
+
+    }
+
+
+    console.log(
+        "Loading vision model..."
+    );
+
+
+    visionModel =
+        await mobilenet.load();
+
+
+    console.log(
+        "Vision model ready."
+    );
+
+
+    return visionModel;
+
+}
+
+
+
+// ======================================================
+// WAIT UNTIL IMAGE IS READY
+// ======================================================
+
+function waitForImage(image) {
+
+
+    return new Promise(
+        function(resolve, reject) {
+
+
+            if (
+                image.complete
+                &&
+                image.naturalWidth > 0
+            ) {
+
+                resolve();
+
+                return;
+
+            }
+
+
+            image.onload =
+                function() {
+
+                    resolve();
+
+                };
+
+
+            image.onerror =
+                function() {
+
+                    reject(
+                        new Error(
+                            "Image could not be loaded."
+                        )
+                    );
+
+                };
+
+        }
+    );
+
+}
+
+
+
+// ======================================================
+// ANALYZE IMAGE
+// ======================================================
+
+async function analyzeImage() {
+
+
+    // If there is no image,
+    // vision step is skipped.
+    if (!selectedImageBase64) {
+
+        return "";
+
+    }
+
+
+    answerBox.innerHTML =
+        "👁️ Analyzing image...";
+
+
+    // Make sure image is loaded
+    await waitForImage(
+        previewImage
+    );
+
+
+    // Make sure vision model is loaded
+    await loadVisionModel();
+
+
+    // Run MobileNet
+    const predictions =
+        await visionModel.classify(
+            previewImage
+        );
+
+
+    console.log(
+        "Vision predictions:"
+    );
+
+
+    console.log(
+        predictions
+    );
+
+
+    // Keep useful predictions
+    const usefulPredictions =
+        predictions
+            .filter(
+                prediction =>
+                    prediction.probability >= 0.03
+            )
+            .slice(
+                0,
+                3
+            );
+
+
+    // Nothing confidently detected
+    if (
+        usefulPredictions.length === 0
+    ) {
+
+        console.log(
+            "No confident vision result."
+        );
+
+        return "";
+
+    }
+
+
+    // Extract names only
+    const labels =
+        usefulPredictions.map(
+            prediction =>
+                prediction.className
+        );
+
+
+    // Example:
+    //
+    // golden retriever,
+    // Labrador retriever,
+    // dog
+
+    const visionDescription =
+        labels.join(", ");
+
+
+    console.log(
+        "Image contains:"
+    );
+
+
+    console.log(
+        visionDescription
+    );
+
+
+    return visionDescription;
+
+}
+
+
+
+// ======================================================
+// ASK BUTTON
 // ======================================================
 
 askButton.addEventListener(
@@ -91,10 +317,19 @@ askButton.addEventListener(
 );
 
 
+
+// ======================================================
+// MAIN ASK FUNCTION
+// ======================================================
+
 async function askAI() {
 
+
+    // Prevent double requests
     if (isThinking) {
+
         return;
+
     }
 
 
@@ -102,10 +337,13 @@ async function askAI() {
         questionInput.value.trim();
 
 
+    // Require a question
     if (question === "") {
+
 
         answerBox.innerHTML =
             "⚠️ Please enter a question.";
+
 
         return;
 
@@ -115,25 +353,44 @@ async function askAI() {
     isThinking = true;
 
 
-    answerBox.innerHTML =
-        "🧠 Thinking...";
+    askButton.disabled =
+        true;
 
 
-    askButton.disabled = true;
+    questionInput.disabled =
+        true;
 
-    questionInput.disabled = true;
 
 
     try {
 
-        // IMPORTANT:
-        //
-        // STEP 0 ONLY
-        //
-        // We are NOT sending the image yet.
-        //
-        // selectedImageBase64 contains the image
-        // ready for the next step.
+
+        // ==================================================
+        // OPTIONAL IMAGE ANALYSIS
+        // ==================================================
+
+        let visionDescription = "";
+
+
+        if (selectedImageBase64) {
+
+
+            visionDescription =
+                await analyzeImage();
+
+
+        }
+
+
+
+        // ==================================================
+        // STEP 1
+        // SEND QUESTION + IMAGE DESCRIPTION
+        // ==================================================
+
+        answerBox.innerHTML =
+            "🔎 Researching websites...";
+
 
         const response =
             await fetch(
@@ -142,59 +399,136 @@ async function askAI() {
 
                     method: "POST",
 
+
                     headers: {
+
                         "Content-Type":
                             "application/json"
+
                     },
 
-                    body: JSON.stringify({
 
-                        question: question
+                    body:
+                        JSON.stringify({
 
-                    })
+                            question:
+                                question,
+
+                            vision:
+                                visionDescription
+
+                        })
 
                 }
             );
 
 
+
+        // ==================================================
+        // READ SERVER RESPONSE
+        // ==================================================
+
         const data =
             await response.json();
 
 
+
+        // ==================================================
+        // DISPLAY ANSWER
+        // ==================================================
+
         if (data.answer) {
 
+
+            // Convert Python newline
+            // into visible HTML spacing.
+
             answerBox.innerHTML =
-                data.answer;
+                data.answer.replace(
+                    /\n/g,
+                    "<br><br>"
+                );
+
 
         }
 
+
         else {
+
 
             answerBox.innerHTML =
                 "⚠️ No answer received.";
 
+
         }
 
+
+        // Useful debugging
+        if (data.vision) {
+
+
+            console.log(
+                "Vision sent to research:"
+            );
+
+
+            console.log(
+                data.vision
+            );
+
+        }
+
+
+        if (data.sources) {
+
+
+            console.log(
+                "Research sources:"
+            );
+
+
+            console.log(
+                data.sources
+            );
+
+        }
+
+
     }
+
 
     catch (error) {
 
-        console.error(error);
+
+        console.error(
+            "ERROR:",
+            error
+        );
+
 
         answerBox.innerHTML =
-            "❌ Unable to connect to AI server.";
+            "❌ Something went wrong.";
+
 
     }
 
+
     finally {
+
 
         isThinking = false;
 
-        askButton.disabled = false;
 
-        questionInput.disabled = false;
+        askButton.disabled =
+            false;
+
+
+        questionInput.disabled =
+            false;
+
 
         questionInput.focus();
+
 
     }
 
@@ -207,24 +541,33 @@ async function askAI() {
 // ======================================================
 
 questionInput.addEventListener(
-    "keydown",
-    function (event) {
 
-        if (event.key === "Enter") {
+    "keydown",
+
+    function(event) {
+
+
+        if (
+            event.key === "Enter"
+        ) {
+
 
             event.preventDefault();
 
+
             askAI();
+
 
         }
 
     }
+
 );
 
 
 
 // ======================================================
-// CAMERA
+// CAMERA BUTTON
 // ======================================================
 
 cameraButton.addEventListener(
@@ -233,33 +576,45 @@ cameraButton.addEventListener(
 );
 
 
+
+// ======================================================
+// OPEN CAMERA
+// ======================================================
+
 async function openCamera() {
+
 
     try {
 
-        // Ask browser for camera permission.
+
         cameraStream =
-            await navigator.mediaDevices.getUserMedia({
+            await navigator.mediaDevices
+                .getUserMedia({
 
-                video: {
+                    video: {
 
-                    facingMode: {
-                        ideal: "environment"
-                    }
+                        facingMode: {
+                            ideal:
+                                "environment"
+                        }
 
-                },
+                    },
 
-                audio: false
+                    audio: false
 
-            });
+                });
 
 
-        // Connect live camera to video element.
+
+        // Put live camera into video element
+
         cameraVideo.srcObject =
             cameraStream;
 
 
-        // Hide old image.
+
+        // Hide other things
+
         previewImage.style.display =
             "none";
 
@@ -272,7 +627,9 @@ async function openCamera() {
             "none";
 
 
-        // Show camera.
+
+        // Show live camera
+
         cameraVideo.style.display =
             "block";
 
@@ -280,9 +637,12 @@ async function openCamera() {
         cameraControls.style.display =
             "flex";
 
+
     }
 
+
     catch (error) {
+
 
         console.error(
             "Camera error:",
@@ -294,6 +654,7 @@ async function openCamera() {
             "Camera could not be opened. Please allow camera permission or choose an image instead."
         );
 
+
     }
 
 }
@@ -301,7 +662,7 @@ async function openCamera() {
 
 
 // ======================================================
-// TAKE PHOTO
+// TAKE PHOTO BUTTON
 // ======================================================
 
 takePhotoButton.addEventListener(
@@ -310,26 +671,44 @@ takePhotoButton.addEventListener(
 );
 
 
+
+// ======================================================
+// TAKE PHOTO
+// ======================================================
+
 function takePhoto() {
 
+
     if (!cameraStream) {
+
         return;
+
     }
 
 
-    // Match canvas size to camera image.
+
+    // Make canvas same resolution
+    // as camera
+
     cameraCanvas.width =
         cameraVideo.videoWidth;
+
 
     cameraCanvas.height =
         cameraVideo.videoHeight;
 
 
+
     const context =
-        cameraCanvas.getContext("2d");
+        cameraCanvas.getContext(
+            "2d"
+        );
 
 
-    // Draw current camera frame onto canvas.
+
+    // Copy current camera frame
+    // onto canvas
+
     context.drawImage(
 
         cameraVideo,
@@ -343,16 +722,25 @@ function takePhoto() {
     );
 
 
-    // Convert captured image to Base64.
+
+    // ==================================================
+    // STEP 0
+    // CAMERA IMAGE → BASE64
+    // ==================================================
+
     selectedImageBase64 =
         cameraCanvas.toDataURL(
+
             "image/jpeg",
+
             0.9
+
         );
 
 
+
     console.log(
-        "Camera image converted to Base64 successfully."
+        "Camera image converted to Base64."
     );
 
 
@@ -364,11 +752,11 @@ function takePhoto() {
     );
 
 
-    // Stop camera.
+
     stopCamera();
 
 
-    // Show captured image.
+
     showImagePreview(
         selectedImageBase64
     );
@@ -382,14 +770,36 @@ function takePhoto() {
 // ======================================================
 
 cancelCameraButton.addEventListener(
+
     "click",
-    function () {
+
+    function() {
+
 
         stopCamera();
 
-        showPlaceholder();
+
+        if (selectedImageBase64) {
+
+
+            showImagePreview(
+                selectedImageBase64
+            );
+
+
+        }
+
+
+        else {
+
+
+            showPlaceholder();
+
+
+        }
 
     }
+
 );
 
 
@@ -400,18 +810,26 @@ cancelCameraButton.addEventListener(
 
 function stopCamera() {
 
+
     if (cameraStream) {
+
 
         cameraStream
             .getTracks()
             .forEach(
-                track => track.stop()
+
+                track =>
+                    track.stop()
+
             );
 
 
-        cameraStream = null;
+        cameraStream =
+            null;
+
 
     }
+
 
 
     cameraVideo.srcObject =
@@ -430,84 +848,111 @@ function stopCamera() {
 
 
 // ======================================================
-// CLICK PREVIEW AREA → FILE PICKER
+// CLICK DROP AREA → FILE PICKER
 // ======================================================
 
 dropZone.addEventListener(
-    "click",
-    function () {
 
-        // Don't open file selector
-        // while camera is running.
+    "click",
+
+    function() {
+
+
+        // Don't open file picker
+        // while camera is active
 
         if (cameraStream) {
+
             return;
+
         }
 
 
         imageInput.click();
 
+
     }
+
 );
 
 
 
 // ======================================================
-// NORMAL IMAGE SELECTION
+// FILE SELECTED
 // ======================================================
 
 imageInput.addEventListener(
+
     "change",
-    function () {
+
+    function() {
+
 
         const file =
             imageInput.files[0];
 
 
         if (!file) {
+
             return;
+
         }
 
 
-        convertFileToBase64(file);
+        convertFileToBase64(
+            file
+        );
+
 
     }
+
 );
 
 
 
 // ======================================================
-// DRAG IMAGE OVER DROP ZONE
+// DRAG OVER
 // ======================================================
 
 dropZone.addEventListener(
+
     "dragover",
-    function (event) {
+
+    function(event) {
+
 
         event.preventDefault();
+
 
         dropZone.classList.add(
             "dragging"
         );
 
+
     }
+
 );
 
 
 
 // ======================================================
-// DRAG LEAVES AREA
+// DRAG LEAVE
 // ======================================================
 
 dropZone.addEventListener(
+
     "dragleave",
-    function () {
+
+    function() {
+
 
         dropZone.classList.remove(
             "dragging"
         );
 
+
     }
+
 );
 
 
@@ -517,8 +962,11 @@ dropZone.addEventListener(
 // ======================================================
 
 dropZone.addEventListener(
+
     "drop",
-    function (event) {
+
+    function(event) {
+
 
         event.preventDefault();
 
@@ -533,50 +981,71 @@ dropZone.addEventListener(
 
 
         if (!file) {
+
             return;
+
         }
 
 
-        convertFileToBase64(file);
+        convertFileToBase64(
+            file
+        );
+
 
     }
+
 );
 
 
 
 // ======================================================
-// CONVERT FILE TO BASE64
+// CONVERT NORMAL FILE → BASE64
 // ======================================================
 
 function convertFileToBase64(file) {
 
-    // Make sure it is actually an image.
-    if (!file.type.startsWith("image/")) {
+
+    // Make sure it is an image
+
+    if (
+        !file.type.startsWith(
+            "image/"
+        )
+    ) {
+
 
         alert(
             "Please choose an image file."
         );
+
 
         return;
 
     }
 
 
+
     const reader =
         new FileReader();
 
 
+
     reader.onload =
-        function (event) {
+        function(event) {
 
 
-            // Store complete Base64 image.
+            // ==================================================
+            // STEP 0
+            // FILE → BASE64
+            // ==================================================
+
             selectedImageBase64 =
                 event.target.result;
 
 
+
             console.log(
-                "Image converted to Base64 successfully."
+                "Image converted to Base64."
             );
 
 
@@ -588,18 +1057,22 @@ function convertFileToBase64(file) {
             );
 
 
+
             showImagePreview(
                 selectedImageBase64
             );
 
+
         };
 
 
+
     reader.onerror =
-        function () {
+        function() {
+
 
             console.error(
-                "Error reading image."
+                "Could not read image."
             );
 
 
@@ -607,10 +1080,14 @@ function convertFileToBase64(file) {
                 "Could not read this image."
             );
 
+
         };
 
 
-    reader.readAsDataURL(file);
+
+    reader.readAsDataURL(
+        file
+    );
 
 }
 
@@ -620,7 +1097,10 @@ function convertFileToBase64(file) {
 // SHOW IMAGE PREVIEW
 // ======================================================
 
-function showImagePreview(base64Image) {
+function showImagePreview(
+    base64Image
+) {
+
 
     placeholder.style.display =
         "none";
@@ -646,10 +1126,11 @@ function showImagePreview(base64Image) {
 
 
 // ======================================================
-// SHOW EMPTY PLACEHOLDER
+// SHOW EMPTY IMAGE AREA
 // ======================================================
 
 function showPlaceholder() {
+
 
     previewImage.style.display =
         "none";
@@ -679,8 +1160,18 @@ function showPlaceholder() {
 // ======================================================
 
 removeImageButton.addEventListener(
+
     "click",
-    function () {
+
+    function(event) {
+
+
+        // Prevent click from also
+        // opening file picker
+
+        event.stopPropagation();
+
+
 
         selectedImageBase64 =
             "";
@@ -693,9 +1184,12 @@ removeImageButton.addEventListener(
         showPlaceholder();
 
 
+
         console.log(
             "Image removed."
         );
 
+
     }
+
 );
