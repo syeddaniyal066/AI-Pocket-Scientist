@@ -5,37 +5,118 @@
 
     <meta charset="UTF-8">
 
-    <meta name="viewport"
-          content="width=device-width, initial-scale=1.0">
+    <meta
+        name="viewport"
+        content="width=device-width, initial-scale=1.0"
+    >
 
     <title>AI Pocket Scientist</title>
 
-    <link rel="stylesheet" href="style.css">
+    <link
+        rel="stylesheet"
+        href="style.css"
+    >
 
 </head>
 
 <body>
 
-    <div class="container">
+    <div class="app-layout">
 
-        <h1>🤖 AI Pocket Scientist</h1>
 
-        <p>Your intelligent science assistant</p>
+        <!-- ========================================= -->
+        <!-- LEFT SIDE -->
+        <!-- ========================================= -->
 
-        <input
-            type="text"
-            id="question"
-            placeholder="Ask me anything...">
+        <div class="main-panel">
 
-        <button id="askButton">
-            Ask AI
-        </button>
+            <h1>
+                🤖 AI Pocket Scientist
+            </h1>
 
-        <div id="answer">
-            Your answer will appear here...
+            <p class="subtitle">
+                Your intelligent science assistant
+            </p>
+
+
+            <!-- QUESTION -->
+
+            <input
+                type="text"
+                id="question"
+                placeholder="Ask me anything..."
+            >
+
+
+            <!-- ASK BUTTON -->
+
+            <button id="askButton">
+                Ask AI
+            </button>
+
+
+            <!-- ANSWER -->
+
+            <div id="answer">
+                Your answer will appear here...
+            </div>
+
         </div>
 
+
+
+        <!-- ========================================= -->
+        <!-- RIGHT IMAGE PANEL -->
+        <!-- ========================================= -->
+
+        <div class="image-panel">
+
+
+            <!-- IMAGE BUTTON -->
+
+            <button id="imageButton">
+
+                📷 Click Image
+
+            </button>
+
+
+            <!-- HIDDEN FILE INPUT -->
+
+            <input
+                type="file"
+                id="imageInput"
+                accept="image/*"
+                capture="environment"
+                hidden
+            >
+
+
+            <!-- IMAGE PREVIEW AREA -->
+
+            <div class="preview-box">
+
+                <div
+                    id="previewText"
+                    class="preview-placeholder"
+                >
+                    Image Preview
+                </div>
+
+
+                <img
+                    id="previewImage"
+                    src=""
+                    alt="Selected image"
+                >
+
+            </div>
+
+        </div>
+
+
     </div>
+
 
     <script src="script.js"></script>
 
