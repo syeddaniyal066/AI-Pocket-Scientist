@@ -12,8 +12,7 @@ from summarizer import summarize_research
 app = Flask(__name__)
 
 
-# Allow Netlify / browser to communicate
-# with the Render backend.
+# Allow Netlify/frontend to talk to Render/backend
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
@@ -23,7 +22,7 @@ CORS(
 
 
 # ======================================================
-# HOME PAGE
+# HOME
 # ======================================================
 
 @app.route("/")
@@ -33,7 +32,7 @@ def home():
 
 
 # ======================================================
-# ASK ENDPOINT
+# ASK
 # ======================================================
 
 @app.route("/ask", methods=["POST"])
@@ -41,21 +40,23 @@ def ask():
 
     try:
 
-        # ----------------------------------------------
-        # GET QUESTION FROM JAVASCRIPT
-        # ----------------------------------------------
+        # --------------------------------------------------
+        # GET JSON FROM JAVASCRIPT
+        # --------------------------------------------------
 
         data = request.get_json()
 
 
         if not data:
 
-            return jsonify(
-                {
-                    "answer": "No question received."
-                }
-            ), 400
+            return jsonify({
+                "answer": "No question received."
+            }), 400
 
+
+        # --------------------------------------------------
+        # QUESTION
+        # --------------------------------------------------
 
         question = data.get(
             "question",
@@ -65,51 +66,88 @@ def ask():
 
         if question == "":
 
-            return jsonify(
-                {
-                    "answer":
-                    "Please enter a question."
-                }
-            ), 400
+            return jsonify({
+                "answer": "Please enter a question."
+            }), 400
 
 
-        print("\n=================================")
+        # --------------------------------------------------
+        # VISION RESULT
+        # --------------------------------------------------
+
+        # Example:
+        # "golden retriever, Labrador retriever, dog"
+
+        vision = data.get(
+            "vision",
+            ""
+        ).strip()
+
+
+        print("\n===================================")
         print("QUESTION:")
         print(question)
-        print("=================================")
 
-
-        # ==============================================
-        # STEP 1
-        # SEARCH REAL WEBSITES
-        # ==============================================
-
-        research_results = research_question(
-            question
+        print("\nVISION:")
+        print(
+            vision
+            if vision
+            else "No image"
         )
 
+        print("===================================")
 
-        # Nothing useful found
-        if not research_results:
 
-            return jsonify(
-                {
-                    "answer":
-                    "I could not find enough reliable information for that question."
-                }
+        # ==================================================
+        # BUILD RESEARCH QUERY
+        # ==================================================
+
+        research_query = question
+
+
+        # If an image was analyzed,
+        # add the visual information to the search.
+        if vision:
+
+            research_query = (
+                question
+                + " "
+                + vision
             )
 
 
+        print("\nRESEARCH QUERY:")
+        print(research_query)
+
+
+        # ==================================================
+        # STEP 1
+        # SEARCH REAL WEBSITES
+        # ==================================================
+
+        research_results = research_question(
+            research_query
+        )
+
+
+        if not research_results:
+
+            return jsonify({
+                "answer":
+                "I could not find enough reliable information for that question."
+            })
+
+
         print(
-            "\nResearch websites found:",
+            "\nWebsites found:",
             len(research_results)
         )
 
 
-        # ==============================================
+        # ==================================================
         # STEP 2
         # OUR OWN SUMMARIZER
-        # ==============================================
+        # ==================================================
 
         summary = summarize_research(
             research_results,
@@ -118,48 +156,57 @@ def ask():
         )
 
 
-        print("\n3-LINE SUMMARY:")
+        print("\nSUMMARY:")
         print(summary)
 
 
-        # ==============================================
-        # STEP 3
-        # SEND RESULT TO WEBSITE
-        # ==============================================
+        # ==================================================
+        # SOURCES
+        # ==================================================
 
         sources = [
-            item["url"]
-            for item in research_results
+            result["url"]
+            for result in research_results
         ]
 
 
-        return jsonify(
-            {
-                "answer": summary,
-                "sources": sources,
-                "system": "AI Pocket Scientist Research Engine"
-            }
-        )
+        # ==================================================
+        # STEP 3
+        # SEND RESULT TO WEBSITE
+        # ==================================================
+
+        return jsonify({
+
+            "answer": summary,
+
+            "vision": vision,
+
+            "sources": sources,
+
+            "system":
+                "AI Pocket Scientist Research Engine"
+
+        })
 
 
     except Exception as error:
 
         print(
-            "SERVER ERROR:",
+            "\nSERVER ERROR:",
             error
         )
 
 
-        return jsonify(
-            {
-                "answer":
+        return jsonify({
+
+            "answer":
                 "Something went wrong while researching your question."
-            }
-        ), 500
+
+        }), 500
 
 
 # ======================================================
-# RUN LOCALLY
+# LOCAL RUN
 # ======================================================
 
 if __name__ == "__main__":

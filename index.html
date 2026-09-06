@@ -1,7 +1,9 @@
 <!DOCTYPE html>
+
 <html lang="en">
 
 <head>
+
     <meta charset="UTF-8">
 
     <meta
@@ -9,29 +11,45 @@
         content="width=device-width, initial-scale=1.0"
     >
 
-    <title>AI Pocket Scientist</title>
+    <title>
+        AI Pocket Scientist
+    </title>
+
 
     <link
         rel="stylesheet"
         href="style.css"
     >
+
 </head>
+
 
 <body>
 
+
     <div class="app-layout">
 
-        <!-- =========================
+
+        <!-- =================================================
              LEFT SIDE
-        ========================== -->
+        ================================================== -->
 
         <div class="main-panel">
 
-            <h1>🤖 AI Pocket Scientist</h1>
+
+            <h1>
+                🤖 AI Pocket Scientist
+            </h1>
+
 
             <p class="subtitle">
+
                 Your intelligent science assistant
+
             </p>
+
+
+            <!-- QUESTION -->
 
             <input
                 type="text"
@@ -39,29 +57,47 @@
                 placeholder="Ask me anything..."
             >
 
+
+            <!-- ASK -->
+
             <button id="askButton">
+
                 Ask AI
+
             </button>
 
+
+            <!-- ANSWER -->
+
             <div id="answer">
+
                 Your answer will appear here...
+
             </div>
+
 
         </div>
 
 
-        <!-- =========================
+
+        <!-- =================================================
              RIGHT SIDE
-        ========================== -->
+        ================================================== -->
 
         <div class="image-panel">
 
+
+            <!-- CAMERA BUTTON -->
+
             <button id="cameraButton">
+
                 📷 Click Image
+
             </button>
 
 
-            <!-- Hidden normal file picker -->
+
+            <!-- NORMAL FILE PICKER -->
 
             <input
                 type="file"
@@ -71,30 +107,45 @@
             >
 
 
-            <!-- IMAGE / CAMERA AREA -->
 
-            <div id="dropZone" class="preview-box">
+            <!-- =================================================
+                 IMAGE / CAMERA / DROP AREA
+            ================================================== -->
 
-                <!-- Default message -->
+            <div
+                id="dropZone"
+                class="preview-box"
+            >
 
-                <div id="placeholder" class="placeholder">
+
+                <!-- DEFAULT MESSAGE -->
+
+                <div
+                    id="placeholder"
+                    class="placeholder"
+                >
 
                     <div class="drop-icon">
                         🖼️
                     </div>
 
+
                     <div>
                         Drop image here
                     </div>
 
+
                     <div class="small-text">
+
                         or click here to choose image
+
                     </div>
 
                 </div>
 
 
-                <!-- Live camera -->
+
+                <!-- LIVE CAMERA -->
 
                 <video
                     id="cameraVideo"
@@ -103,51 +154,94 @@
                 ></video>
 
 
-                <!-- Selected / captured image -->
+
+                <!-- IMAGE PREVIEW -->
 
                 <img
                     id="previewImage"
                     alt="Image preview"
                 >
 
+
             </div>
 
 
-            <!-- CAMERA CONTROLS -->
+
+            <!-- =================================================
+                 CAMERA CONTROLS
+            ================================================== -->
 
             <div
                 id="cameraControls"
                 class="camera-controls"
             >
 
+
                 <button id="takePhotoButton">
+
                     📸 Take Photo
+
                 </button>
+
 
                 <button id="cancelCameraButton">
+
                     ✖ Cancel
+
                 </button>
 
+
             </div>
+
 
 
             <!-- REMOVE IMAGE -->
 
             <button id="removeImageButton">
+
                 🗑 Remove Image
+
             </button>
 
 
-            <!-- Used internally to capture camera frame -->
+
+            <!-- CAMERA CAPTURE CANVAS -->
 
             <canvas id="cameraCanvas"></canvas>
 
+
         </div>
+
 
     </div>
 
 
+
+    <!-- =================================================
+         LOCAL COMPUTER VISION LIBRARIES
+
+         TensorFlow.js runs inside browser.
+
+         MobileNet looks at the image.
+
+         No Gemini/OpenRouter/Groq API is used for vision.
+    ================================================== -->
+
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.22.0/dist/tf.min.js">
+    </script>
+
+
+    <script
+        src="https://cdn.jsdelivr.net/npm/@tensorflow-models/mobilenet@2.1.1">
+    </script>
+
+
+    <!-- OUR JAVASCRIPT -->
+
     <script src="script.js"></script>
+
 
 </body>
 
