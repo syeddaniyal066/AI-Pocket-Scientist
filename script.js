@@ -19,7 +19,6 @@
 // ======================================================
 
 
-
 // ======================================================
 // HTML ELEMENTS
 // ======================================================
@@ -27,60 +26,44 @@
 const askButton =
     document.getElementById("askButton");
 
-
 const questionInput =
     document.getElementById("question");
-
 
 const answerBox =
     document.getElementById("answer");
 
-
-
 const cameraButton =
     document.getElementById("cameraButton");
-
 
 const imageInput =
     document.getElementById("imageInput");
 
-
 const dropZone =
     document.getElementById("dropZone");
-
 
 const placeholder =
     document.getElementById("placeholder");
 
-
 const previewImage =
     document.getElementById("previewImage");
-
-
 
 const cameraVideo =
     document.getElementById("cameraVideo");
 
-
 const cameraControls =
     document.getElementById("cameraControls");
-
 
 const takePhotoButton =
     document.getElementById("takePhotoButton");
 
-
 const cancelCameraButton =
     document.getElementById("cancelCameraButton");
-
 
 const removeImageButton =
     document.getElementById("removeImageButton");
 
-
 const cameraCanvas =
     document.getElementById("cameraCanvas");
-
 
 
 // ======================================================
@@ -91,62 +74,42 @@ const API_URL =
     "https://ai-pocket-scientist.onrender.com/ask";
 
 
-
 // ======================================================
 // VARIABLES
 // ======================================================
 
-
-// Prevent multiple requests
 let isThinking = false;
 
-
-// Full Base64 version of image
 let selectedImageBase64 = "";
 
-
-// Camera stream
 let cameraStream = null;
 
-
-// MobileNet vision model
 let visionModel = null;
 
 
-
 // ======================================================
-// LOAD VISION MODEL
+// LOAD MOBILENET
 // ======================================================
 
 async function loadVisionModel() {
 
-
-    // Already loaded
     if (visionModel) {
-
         return visionModel;
-
     }
-
 
     console.log(
         "Loading vision model..."
     );
 
-
     visionModel =
         await mobilenet.load();
-
 
     console.log(
         "Vision model ready."
     );
 
-
     return visionModel;
-
 }
-
 
 
 // ======================================================
@@ -155,31 +118,23 @@ async function loadVisionModel() {
 
 function waitForImage(image) {
 
-
     return new Promise(
         function(resolve, reject) {
 
-
             if (
-                image.complete
-                &&
+                image.complete &&
                 image.naturalWidth > 0
             ) {
 
                 resolve();
-
                 return;
-
             }
-
 
             image.onload =
                 function() {
 
                     resolve();
-
                 };
-
 
             image.onerror =
                 function() {
@@ -189,14 +144,10 @@ function waitForImage(image) {
                             "Image could not be loaded."
                         )
                     );
-
                 };
-
         }
     );
-
 }
-
 
 
 // ======================================================
@@ -205,106 +156,110 @@ function waitForImage(image) {
 
 async function analyzeImage() {
 
-
-    // If there is no image,
-    // vision step is skipped.
+    // No image = skip vision
     if (!selectedImageBase64) {
-
         return "";
-
     }
-
 
     answerBox.innerHTML =
         "👁️ Analyzing image...";
 
-
-    // Make sure image is loaded
+    // Make sure image preview is ready
     await waitForImage(
         previewImage
     );
 
-
-    // Make sure vision model is loaded
+    // Load MobileNet if needed
     await loadVisionModel();
 
-
-    // Run MobileNet
+    // Analyze the image
     const predictions =
         await visionModel.classify(
             previewImage
         );
 
-
     console.log(
-        "Vision predictions:"
+        "All vision predictions:"
     );
-
 
     console.log(
         predictions
     );
 
 
-    // Keep useful predictions
-    const usefulPredictions =
-        predictions
-            .filter(
-                prediction =>
-                    prediction.probability >= 0.03
-            )
-            .slice(
-                0,
-                3
-            );
+    // ==================================================
+    // USE ONLY THE BEST PREDICTION
+    // ==================================================
 
-
-    // Nothing confidently detected
     if (
-        usefulPredictions.length === 0
+        !predictions ||
+        predictions.length === 0
     ) {
 
         console.log(
-            "No confident vision result."
+            "No vision result."
         );
 
         return "";
-
     }
 
 
-    // Extract names only
-    const labels =
-        usefulPredictions.map(
-            prediction =>
-                prediction.className
-        );
+    // First prediction has highest confidence
+    const bestPrediction =
+        predictions[0];
 
 
-    // Example:
+    console.log(
+        "Best prediction:"
+    );
+
+    console.log(
+        bestPrediction
+    );
+
+
+    // MobileNet may return:
     //
-    // golden retriever,
-    // Labrador retriever,
-    // dog
+    // "lycaenid, lycaenid butterfly"
+    //
+    // Split into:
+    //
+    // lycaenid
+    // lycaenid butterfly
 
-    const visionDescription =
-        labels.join(", ");
+    const names =
+        bestPrediction.className
+            .split(",")
+            .map(
+                name =>
+                    name.trim()
+            );
+
+
+    // Prefer the more descriptive name
+    // by choosing the longest one
+
+    names.sort(
+        (a, b) =>
+            b.length - a.length
+    );
+
+
+    const bestLabel =
+        names[0];
 
 
     console.log(
         "Image contains:"
     );
 
-
     console.log(
-        visionDescription
+        bestLabel
     );
 
 
-    return visionDescription;
-
+    return bestLabel;
 }
-
 
 
 // ======================================================
@@ -317,19 +272,14 @@ askButton.addEventListener(
 );
 
 
-
 // ======================================================
 // MAIN ASK FUNCTION
 // ======================================================
 
 async function askAI() {
 
-
-    // Prevent double requests
     if (isThinking) {
-
         return;
-
     }
 
 
@@ -337,56 +287,41 @@ async function askAI() {
         questionInput.value.trim();
 
 
-    // Require a question
     if (question === "") {
-
 
         answerBox.innerHTML =
             "⚠️ Please enter a question.";
 
-
         return;
-
     }
 
 
     isThinking = true;
 
+    askButton.disabled = true;
 
-    askButton.disabled =
-        true;
-
-
-    questionInput.disabled =
-        true;
-
+    questionInput.disabled = true;
 
 
     try {
 
-
-        // ==================================================
-        // OPTIONAL IMAGE ANALYSIS
-        // ==================================================
-
         let visionDescription = "";
 
 
-        if (selectedImageBase64) {
+        // ==============================================
+        // OPTIONAL IMAGE ANALYSIS
+        // ==============================================
 
+        if (selectedImageBase64) {
 
             visionDescription =
                 await analyzeImage();
-
-
         }
 
 
-
-        // ==================================================
-        // STEP 1
-        // SEND QUESTION + IMAGE DESCRIPTION
-        // ==================================================
+        // ==============================================
+        // SEND TO BACKEND
+        // ==============================================
 
         answerBox.innerHTML =
             "🔎 Researching websites...";
@@ -399,14 +334,11 @@ async function askAI() {
 
                     method: "POST",
 
-
                     headers: {
 
                         "Content-Type":
                             "application/json"
-
                     },
-
 
                     body:
                         JSON.stringify({
@@ -418,152 +350,104 @@ async function askAI() {
                                 visionDescription
 
                         })
-
                 }
             );
 
-
-
-        // ==================================================
-        // READ SERVER RESPONSE
-        // ==================================================
 
         const data =
             await response.json();
 
 
-
-        // ==================================================
-        // DISPLAY ANSWER
-        // ==================================================
+        // ==============================================
+        // SHOW ANSWER
+        // ==============================================
 
         if (data.answer) {
-
-
-            // Convert Python newline
-            // into visible HTML spacing.
 
             answerBox.innerHTML =
                 data.answer.replace(
                     /\n/g,
                     "<br><br>"
                 );
-
-
         }
-
 
         else {
 
-
             answerBox.innerHTML =
                 "⚠️ No answer received.";
-
-
         }
 
 
-        // Useful debugging
-        if (data.vision) {
+        // ==============================================
+        // DEBUG INFORMATION
+        // ==============================================
 
+        console.log(
+            "Vision sent to research:"
+        );
 
-            console.log(
-                "Vision sent to research:"
-            );
-
-
-            console.log(
-                data.vision
-            );
-
-        }
+        console.log(
+            visionDescription
+        );
 
 
         if (data.sources) {
-
 
             console.log(
                 "Research sources:"
             );
 
-
             console.log(
                 data.sources
             );
-
         }
-
 
     }
 
-
     catch (error) {
-
 
         console.error(
             "ERROR:",
             error
         );
 
-
         answerBox.innerHTML =
             "❌ Something went wrong.";
-
-
     }
-
 
     finally {
 
-
         isThinking = false;
-
 
         askButton.disabled =
             false;
 
-
         questionInput.disabled =
             false;
 
-
         questionInput.focus();
-
-
     }
-
 }
 
 
-
 // ======================================================
-// PRESS ENTER
+// ENTER KEY
 // ======================================================
 
 questionInput.addEventListener(
-
     "keydown",
-
     function(event) {
-
 
         if (
             event.key === "Enter"
         ) {
 
-
             event.preventDefault();
 
-
             askAI();
-
-
         }
-
     }
-
 );
-
 
 
 // ======================================================
@@ -576,16 +460,13 @@ cameraButton.addEventListener(
 );
 
 
-
 // ======================================================
 // OPEN CAMERA
 // ======================================================
 
 async function openCamera() {
 
-
     try {
-
 
         cameraStream =
             await navigator.mediaDevices
@@ -597,68 +478,45 @@ async function openCamera() {
                             ideal:
                                 "environment"
                         }
-
                     },
 
                     audio: false
-
                 });
 
-
-
-        // Put live camera into video element
 
         cameraVideo.srcObject =
             cameraStream;
 
 
-
-        // Hide other things
-
         previewImage.style.display =
             "none";
 
-
         placeholder.style.display =
             "none";
-
 
         removeImageButton.style.display =
             "none";
 
 
-
-        // Show live camera
-
         cameraVideo.style.display =
             "block";
 
-
         cameraControls.style.display =
             "flex";
-
-
     }
 
-
     catch (error) {
-
 
         console.error(
             "Camera error:",
             error
         );
 
-
         alert(
             "Camera could not be opened. Please allow camera permission or choose an image instead."
         );
-
-
     }
-
 }
-
 
 
 // ======================================================
@@ -671,32 +529,22 @@ takePhotoButton.addEventListener(
 );
 
 
-
 // ======================================================
 // TAKE PHOTO
 // ======================================================
 
 function takePhoto() {
 
-
     if (!cameraStream) {
-
         return;
-
     }
 
-
-
-    // Make canvas same resolution
-    // as camera
 
     cameraCanvas.width =
         cameraVideo.videoWidth;
 
-
     cameraCanvas.height =
         cameraVideo.videoHeight;
-
 
 
     const context =
@@ -704,10 +552,6 @@ function takePhoto() {
             "2d"
         );
 
-
-
-    // Copy current camera frame
-    // onto canvas
 
     context.drawImage(
 
@@ -718,15 +562,12 @@ function takePhoto() {
 
         cameraCanvas.width,
         cameraCanvas.height
-
     );
 
 
-
-    // ==================================================
-    // STEP 0
+    // ==============================================
     // CAMERA IMAGE → BASE64
-    // ==================================================
+    // ==============================================
 
     selectedImageBase64 =
         cameraCanvas.toDataURL(
@@ -734,9 +575,7 @@ function takePhoto() {
             "image/jpeg",
 
             0.9
-
         );
-
 
 
     console.log(
@@ -744,25 +583,13 @@ function takePhoto() {
     );
 
 
-    console.log(
-        selectedImageBase64.substring(
-            0,
-            100
-        ) + "..."
-    );
-
-
-
     stopCamera();
-
 
 
     showImagePreview(
         selectedImageBase64
     );
-
 }
-
 
 
 // ======================================================
@@ -770,38 +597,24 @@ function takePhoto() {
 // ======================================================
 
 cancelCameraButton.addEventListener(
-
     "click",
-
     function() {
-
 
         stopCamera();
 
-
         if (selectedImageBase64) {
-
 
             showImagePreview(
                 selectedImageBase64
             );
-
-
         }
-
 
         else {
 
-
             showPlaceholder();
-
-
         }
-
     }
-
 );
-
 
 
 // ======================================================
@@ -810,41 +623,29 @@ cancelCameraButton.addEventListener(
 
 function stopCamera() {
 
-
     if (cameraStream) {
-
 
         cameraStream
             .getTracks()
             .forEach(
-
                 track =>
                     track.stop()
-
             );
-
 
         cameraStream =
             null;
-
-
     }
-
 
 
     cameraVideo.srcObject =
         null;
 
-
     cameraVideo.style.display =
         "none";
 
-
     cameraControls.style.display =
         "none";
-
 }
-
 
 
 // ======================================================
@@ -852,29 +653,16 @@ function stopCamera() {
 // ======================================================
 
 dropZone.addEventListener(
-
     "click",
-
     function() {
 
-
-        // Don't open file picker
-        // while camera is active
-
         if (cameraStream) {
-
             return;
-
         }
 
-
         imageInput.click();
-
-
     }
-
 );
-
 
 
 // ======================================================
@@ -882,32 +670,21 @@ dropZone.addEventListener(
 // ======================================================
 
 imageInput.addEventListener(
-
     "change",
-
     function() {
-
 
         const file =
             imageInput.files[0];
 
-
         if (!file) {
-
             return;
-
         }
-
 
         convertFileToBase64(
             file
         );
-
-
     }
-
 );
-
 
 
 // ======================================================
@@ -915,24 +692,16 @@ imageInput.addEventListener(
 // ======================================================
 
 dropZone.addEventListener(
-
     "dragover",
-
     function(event) {
 
-
         event.preventDefault();
-
 
         dropZone.classList.add(
             "dragging"
         );
-
-
     }
-
 );
-
 
 
 // ======================================================
@@ -940,21 +709,14 @@ dropZone.addEventListener(
 // ======================================================
 
 dropZone.addEventListener(
-
     "dragleave",
-
     function() {
-
 
         dropZone.classList.remove(
             "dragging"
         );
-
-
     }
-
 );
-
 
 
 // ======================================================
@@ -962,14 +724,10 @@ dropZone.addEventListener(
 // ======================================================
 
 dropZone.addEventListener(
-
     "drop",
-
     function(event) {
 
-
         event.preventDefault();
-
 
         dropZone.classList.remove(
             "dragging"
@@ -977,35 +735,27 @@ dropZone.addEventListener(
 
 
         const file =
-            event.dataTransfer.files[0];
+            event.dataTransfer
+                .files[0];
 
 
         if (!file) {
-
             return;
-
         }
 
 
         convertFileToBase64(
             file
         );
-
-
     }
-
 );
 
 
-
 // ======================================================
-// CONVERT NORMAL FILE → BASE64
+// FILE → BASE64
 // ======================================================
 
 function convertFileToBase64(file) {
-
-
-    // Make sure it is an image
 
     if (
         !file.type.startsWith(
@@ -1013,35 +763,23 @@ function convertFileToBase64(file) {
         )
     ) {
 
-
         alert(
             "Please choose an image file."
         );
 
-
         return;
-
     }
-
 
 
     const reader =
         new FileReader();
 
 
-
     reader.onload =
         function(event) {
 
-
-            // ==================================================
-            // STEP 0
-            // FILE → BASE64
-            // ==================================================
-
             selectedImageBase64 =
                 event.target.result;
-
 
 
             console.log(
@@ -1049,110 +787,77 @@ function convertFileToBase64(file) {
             );
 
 
-            console.log(
-                selectedImageBase64.substring(
-                    0,
-                    100
-                ) + "..."
-            );
-
-
-
             showImagePreview(
                 selectedImageBase64
             );
-
-
         };
-
 
 
     reader.onerror =
         function() {
 
-
             console.error(
                 "Could not read image."
             );
 
-
             alert(
                 "Could not read this image."
             );
-
-
         };
-
 
 
     reader.readAsDataURL(
         file
     );
-
 }
 
 
-
 // ======================================================
-// SHOW IMAGE PREVIEW
+// SHOW IMAGE
 // ======================================================
 
 function showImagePreview(
     base64Image
 ) {
 
-
     placeholder.style.display =
         "none";
 
-
     cameraVideo.style.display =
         "none";
-
 
     previewImage.src =
         base64Image;
 
-
     previewImage.style.display =
         "block";
 
-
     removeImageButton.style.display =
         "block";
-
 }
 
 
-
 // ======================================================
-// SHOW EMPTY IMAGE AREA
+// SHOW PLACEHOLDER
 // ======================================================
 
 function showPlaceholder() {
 
-
     previewImage.style.display =
         "none";
-
 
     previewImage.src =
         "";
 
-
     cameraVideo.style.display =
         "none";
-
 
     placeholder.style.display =
         "block";
 
-
     removeImageButton.style.display =
         "none";
-
 }
-
 
 
 // ======================================================
@@ -1160,36 +865,21 @@ function showPlaceholder() {
 // ======================================================
 
 removeImageButton.addEventListener(
-
     "click",
-
     function(event) {
 
-
-        // Prevent click from also
-        // opening file picker
-
         event.stopPropagation();
-
-
 
         selectedImageBase64 =
             "";
 
-
         imageInput.value =
             "";
 
-
         showPlaceholder();
-
-
 
         console.log(
             "Image removed."
         );
-
-
     }
-
 );
