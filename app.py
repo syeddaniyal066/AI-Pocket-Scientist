@@ -12,7 +12,7 @@ from summarizer import summarize_research
 app = Flask(__name__)
 
 
-# Allow frontend / Netlify to talk to backend / Render
+# Allow Netlify frontend to talk to Render backend
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
@@ -22,7 +22,7 @@ CORS(
 
 
 # ======================================================
-# HOME ROUTE
+# HOME
 # ======================================================
 
 @app.route("/")
@@ -32,7 +32,7 @@ def home():
 
 
 # ======================================================
-# ASK ROUTE
+# ASK
 # ======================================================
 
 @app.route("/ask", methods=["POST"])
@@ -41,7 +41,7 @@ def ask():
     try:
 
         # --------------------------------------------------
-        # GET DATA FROM JAVASCRIPT
+        # RECEIVE DATA FROM JAVASCRIPT
         # --------------------------------------------------
 
         data = request.get_json()
@@ -55,7 +55,7 @@ def ask():
 
 
         # --------------------------------------------------
-        # GET QUESTION
+        # QUESTION
         # --------------------------------------------------
 
         question = data.get(
@@ -72,11 +72,11 @@ def ask():
 
 
         # --------------------------------------------------
-        # GET VISION RESULT
+        # VISION RESULT
         # --------------------------------------------------
 
         # Example:
-        # "butterfly, monarch butterfly, insect"
+        # lycaenid butterfly
 
         vision = data.get(
             "vision",
@@ -84,12 +84,7 @@ def ask():
         ).strip()
 
 
-        # --------------------------------------------------
-        # DEBUG PRINT
-        # --------------------------------------------------
-
         print("\n===================================")
-
         print("QUESTION:")
         print(question)
 
@@ -104,7 +99,7 @@ def ask():
 
 
         # ==================================================
-        # BUILD RESEARCH QUERY
+        # DEFAULT
         # ==================================================
 
         research_query = question
@@ -112,25 +107,33 @@ def ask():
         summary_question = question
 
 
-        # --------------------------------------------------
-        # IF IMAGE EXISTS
-        # --------------------------------------------------
+        # ==================================================
+        # IMAGE EXISTS
+        # ==================================================
 
         if vision:
 
             question_lower = question.lower()
 
 
-            # Questions like:
+            # ------------------------------------------------
+            # GENERIC IMAGE QUESTIONS
+            # ------------------------------------------------
             #
-            # what is this?
-            # what is this image?
-            # identify this
+            # Example:
             #
-            # are too generic for normal web search.
+            # "what is this image"
+            # "what is this"
+            # "identify this"
             #
-            # So we search mainly using what
-            # MobileNet detected.
+            # In these cases we IGNORE the question
+            # for web search.
+            #
+            # We search ONLY:
+            #
+            # lycaenid butterfly
+            #
+            # ------------------------------------------------
 
             generic_image_questions = [
 
@@ -140,12 +143,16 @@ def ask():
                 "what is that image",
                 "what's this",
                 "what's that",
+
                 "identify this",
                 "identify that",
                 "identify image",
                 "identify the image",
+
                 "what animal is this",
-                "what object is this"
+                "what object is this",
+                "what plant is this",
+                "what insect is this"
 
             ]
 
@@ -159,41 +166,35 @@ def ask():
             )
 
 
-            # ------------------------------------------------
+            # ==================================================
             # GENERIC IMAGE QUESTION
-            # ------------------------------------------------
+            # ==================================================
 
             if is_generic_image_question:
 
-                research_query = (
-                    vision
-                    + " science identification"
-                )
+                # Search ONLY vision result
+                research_query = vision
 
-
-                # For summarizer,
-                # focus on the detected object.
-
+                # Summarizer also focuses
+                # on vision result
                 summary_question = vision
 
 
-            # ------------------------------------------------
-            # IMAGE + SPECIFIC QUESTION
-            # ------------------------------------------------
+            # ==================================================
+            # SPECIFIC IMAGE QUESTION
+            # ==================================================
+            #
+            # Example:
+            #
+            # "Why are this butterfly's wings blue?"
+            #
+            # We need BOTH:
+            #
+            # question + vision
+            #
+            # ==================================================
 
             else:
-
-                # Example:
-                #
-                # Question:
-                # Why does this butterfly have blue wings?
-                #
-                # Vision:
-                # butterfly, insect
-                #
-                # Search:
-                # Why does this butterfly have blue wings?
-                # butterfly insect
 
                 research_query = (
                     question
@@ -210,7 +211,7 @@ def ask():
 
 
         # ==================================================
-        # PRINT FINAL SEARCH QUERY
+        # SHOW FINAL QUERY IN RENDER LOGS
         # ==================================================
 
         print("\nRESEARCH QUERY:")
@@ -223,7 +224,7 @@ def ask():
 
         # ==================================================
         # STEP 1
-        # SEARCH REAL WEBSITES
+        # SEARCH WEBSITES
         # ==================================================
 
         research_results = research_question(
@@ -231,20 +232,30 @@ def ask():
         )
 
 
-        # --------------------------------------------------
-        # NOTHING FOUND
-        # --------------------------------------------------
+        # ==================================================
+        # NO RESULTS
+        # ==================================================
 
         if not research_results:
+
+            print(
+                "\nNO RESEARCH RESULTS FOUND"
+            )
+
 
             return jsonify({
 
                 "answer":
                     "I could not find enough reliable information for that question.",
 
-                "vision": vision,
+                "vision":
+                    vision,
 
-                "sources": [],
+                "research_query":
+                    research_query,
+
+                "sources":
+                    [],
 
                 "system":
                     "AI Pocket Scientist Research Engine"
@@ -253,7 +264,7 @@ def ask():
 
 
         print(
-            "\nWebsites found:",
+            "\nWEBSITES FOUND:",
             len(research_results)
         )
 
@@ -274,13 +285,12 @@ def ask():
         )
 
 
-        print("\n3-LINE SUMMARY:")
-
+        print("\nSUMMARY:")
         print(summary)
 
 
         # ==================================================
-        # COLLECT SOURCE URLS
+        # SOURCES
         # ==================================================
 
         sources = [
@@ -294,16 +304,22 @@ def ask():
 
         # ==================================================
         # STEP 3
-        # SEND ANSWER TO FRONTEND
+        # SEND RESULT TO NETLIFY PAGE
         # ==================================================
 
         return jsonify({
 
-            "answer": summary,
+            "answer":
+                summary,
 
-            "vision": vision,
+            "vision":
+                vision,
 
-            "sources": sources,
+            "research_query":
+                research_query,
+
+            "sources":
+                sources,
 
             "system":
                 "AI Pocket Scientist Research Engine"
@@ -312,13 +328,12 @@ def ask():
 
 
     # ======================================================
-    # ERROR HANDLING
+    # ERROR
     # ======================================================
 
     except Exception as error:
 
         print("\nSERVER ERROR:")
-
         print(error)
 
 
