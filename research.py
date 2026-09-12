@@ -15,18 +15,15 @@ from summarizer import summarize_research
 # AI POCKET SCIENTIST
 # STEP 1 - WEB RESEARCH ENGINE
 #
-# NO CHATBOT
-# NO GEMINI
-# NO GROQ
-# NO PERPLEXITY
+# MEMORY-OPTIMIZED FOR RENDER
 #
 # Question
 #    ↓
-# DuckDuckGo Lite search
+# DuckDuckGo Lite
 #    ↓
-# Trusted websites only
+# Trusted websites
 #    ↓
-# Read webpage text
+# Read limited webpage data
 #    ↓
 # summarizer.py
 #    ↓
@@ -38,7 +35,25 @@ from summarizer import summarize_research
 # SETTINGS
 # ======================================================
 
-MAX_WEBSITES = 5
+# We only need a few good sources
+# for a short 3-line answer.
+MAX_WEBSITES = 3
+
+
+# Maximum amount of HTML downloaded
+# from ONE website.
+#
+# 500 KB prevents very large webpages
+# from filling Render memory.
+MAX_DOWNLOAD_BYTES = 500000
+
+
+# Maximum useful text kept from ONE website.
+MAX_TEXT_CHARS = 6000
+
+
+# Request timeout
+REQUEST_TIMEOUT = 8
 
 
 # ======================================================
@@ -47,9 +62,9 @@ MAX_WEBSITES = 5
 
 TRUSTED_DOMAINS = [
 
-    # -------------------------
+    # --------------------------------------------------
     # GENERAL SCIENCE
-    # -------------------------
+    # --------------------------------------------------
 
     "nasa.gov",
     "usgs.gov",
@@ -68,9 +83,9 @@ TRUSTED_DOMAINS = [
     "cern.ch",
 
 
-    # -------------------------
+    # --------------------------------------------------
     # UNIVERSITIES
-    # -------------------------
+    # --------------------------------------------------
 
     "mit.edu",
     "harvard.edu",
@@ -82,9 +97,9 @@ TRUSTED_DOMAINS = [
     "ox.ac.uk",
 
 
-    # -------------------------
+    # --------------------------------------------------
     # EDUCATION
-    # -------------------------
+    # --------------------------------------------------
 
     "khanacademy.org",
     "openstax.org",
@@ -94,17 +109,17 @@ TRUSTED_DOMAINS = [
     "libretexts.org",
 
 
-    # -------------------------
+    # --------------------------------------------------
     # ENCYCLOPEDIAS
-    # -------------------------
+    # --------------------------------------------------
 
     "britannica.com",
     "wikipedia.org",
 
 
-    # -------------------------
+    # --------------------------------------------------
     # GENERAL SCIENCE / NATURE
-    # -------------------------
+    # --------------------------------------------------
 
     "nationalgeographic.com",
     "smithsonianmag.com",
@@ -121,18 +136,18 @@ TRUSTED_DOMAINS = [
     "royalsociety.org",
 
 
-    # -------------------------
+    # --------------------------------------------------
     # HEALTH / HUMAN BODY
-    # -------------------------
+    # --------------------------------------------------
 
     "kidshealth.org",
     "mayoclinic.org",
     "clevelandclinic.org",
 
 
-    # -------------------------
+    # --------------------------------------------------
     # ANIMAL / WILDLIFE
-    # -------------------------
+    # --------------------------------------------------
 
     "animaldiversity.org",
     "gbif.org",
@@ -140,9 +155,19 @@ TRUSTED_DOMAINS = [
     "iucnredlist.org",
     "mammaldiversity.org",
 
+
+    # --------------------------------------------------
+    # BIRDS
+    # --------------------------------------------------
+
     "allaboutbirds.org",
     "ebird.org",
     "audubon.org",
+
+
+    # --------------------------------------------------
+    # INSECTS / BUTTERFLIES
+    # --------------------------------------------------
 
     "bugguide.net",
     "butterfliesandmoths.org",
@@ -150,11 +175,26 @@ TRUSTED_DOMAINS = [
     "butterfly-conservation.org",
     "monarchjointventure.org",
 
+
+    # --------------------------------------------------
+    # FISH / MARINE LIFE
+    # --------------------------------------------------
+
     "fishbase.se",
     "marinespecies.org",
 
+
+    # --------------------------------------------------
+    # REPTILES / AMPHIBIANS
+    # --------------------------------------------------
+
     "reptile-database.reptarium.cz",
     "amphibiaweb.org",
+
+
+    # --------------------------------------------------
+    # WILDLIFE ORGANIZATIONS
+    # --------------------------------------------------
 
     "sandiegozoowildlifealliance.org",
     "worldwildlife.org",
@@ -193,25 +233,35 @@ def is_trusted_url(url):
 
     try:
 
-        parsed = urlparse(url)
+        parsed = urlparse(
+            url
+        )
 
-        domain = parsed.netloc.lower()
+        domain = (
+            parsed
+            .netloc
+            .lower()
+            .split(":")[0]
+        )
 
-        # Remove port if any
-        domain = domain.split(":")[0]
 
         # Remove www.
-        if domain.startswith("www."):
+        if domain.startswith(
+            "www."
+        ):
 
             domain = domain[4:]
 
 
         for trusted in TRUSTED_DOMAINS:
 
+            # Exact domain
             if domain == trusted:
+
                 return True
 
 
+            # Subdomain
             if domain.endswith(
                 "." + trusted
             ):
@@ -228,7 +278,7 @@ def is_trusted_url(url):
 
 
 # ======================================================
-# GET REAL URL FROM DUCKDUCKGO REDIRECT
+# GET REAL URL FROM DUCKDUCKGO
 # ======================================================
 
 def get_real_url(url):
@@ -240,26 +290,29 @@ def get_real_url(url):
 
     try:
 
-        # Sometimes DuckDuckGo gives:
+        # DuckDuckGo may return:
         #
-        # //duckduckgo.com/l/?uddg=https%3A%2F%2F...
+        # //duckduckgo.com/l/?uddg=...
         #
-        # or:
-        #
-        # https://duckduckgo.com/l/?uddg=...
+        # Convert // into https://
 
         if url.startswith("//"):
 
             url = "https:" + url
 
 
-        parsed = urlparse(url)
+        parsed = urlparse(
+            url
+        )
 
 
+        # DuckDuckGo redirect URL
         if (
-            "duckduckgo.com" in parsed.netloc
+            "duckduckgo.com"
+            in parsed.netloc
             and
-            "uddg=" in parsed.query
+            "uddg="
+            in parsed.query
         ):
 
             params = parse_qs(
@@ -267,15 +320,15 @@ def get_real_url(url):
             )
 
 
-            real_url = params.get(
+            real_urls = params.get(
                 "uddg"
             )
 
 
-            if real_url:
+            if real_urls:
 
                 return unquote(
-                    real_url[0]
+                    real_urls[0]
                 )
 
 
@@ -288,13 +341,18 @@ def get_real_url(url):
 
 
 # ======================================================
-# SEARCH DUCKDUCKGO LITE
+# SEARCH DUCKDUCKGO
 # ======================================================
 
 def search_once(search_query):
 
-    print("\nTrying search:")
-    print(search_query)
+    print(
+        "\nTrying search:"
+    )
+
+    print(
+        search_query
+    )
 
 
     search_url = (
@@ -314,7 +372,7 @@ def search_once(search_query):
 
             headers=HEADERS,
 
-            timeout=20
+            timeout=REQUEST_TIMEOUT
 
         )
 
@@ -328,6 +386,7 @@ def search_once(search_query):
         )
 
 
+        # Parse search result page
         soup = BeautifulSoup(
             response.text,
             "html.parser"
@@ -337,8 +396,10 @@ def search_once(search_query):
         links = []
 
 
-        # Look at every link returned by DDG Lite
-        for tag in soup.find_all("a"):
+        # Look through every link
+        for tag in soup.find_all(
+            "a"
+        ):
 
             href = tag.get(
                 "href"
@@ -346,6 +407,7 @@ def search_once(search_query):
 
 
             if not href:
+
                 continue
 
 
@@ -355,18 +417,26 @@ def search_once(search_query):
 
 
             if not real_url:
+
                 continue
 
 
+            # Must be real web URL
             if not real_url.startswith(
-                ("http://", "https://")
+                (
+                    "http://",
+                    "https://"
+                )
             ):
+
                 continue
 
 
+            # Only trusted sources
             if not is_trusted_url(
                 real_url
             ):
+
                 continue
 
 
@@ -383,8 +453,20 @@ def search_once(search_query):
                 )
 
 
+            # Stop immediately when we have enough.
+            if len(links) >= MAX_WEBSITES:
+
+                break
+
+
+        # Release BeautifulSoup memory
+        soup.decompose()
+
+        del soup
+
+
         print(
-            "Trusted results from this search:",
+            "Trusted results:",
             len(links)
         )
 
@@ -398,7 +480,9 @@ def search_once(search_query):
             "Search error:"
         )
 
-        print(error)
+        print(
+            error
+        )
 
 
         return []
@@ -432,78 +516,52 @@ def search_web(question):
     )
 
 
-    links = []
-
-
     # --------------------------------------------------
-    # 1. EXACT SEARCH
+    # SEARCH 1
+    # EXACT QUERY
     # --------------------------------------------------
 
-    exact_results = search_once(
+    results = search_once(
         question
     )
 
 
-    for url in exact_results:
+    # If we found something useful,
+    # stop searching immediately.
+    if results:
 
-        if url not in links:
-
-            links.append(
-                url
-            )
-
-
-        if len(links) >= MAX_WEBSITES:
-
-            return links
+        return results[
+            :MAX_WEBSITES
+        ]
 
 
     # --------------------------------------------------
-    # 2. FALLBACK SEARCHES
+    # SEARCH 2
+    # ONLY ONE FALLBACK
     # --------------------------------------------------
 
-    fallback_queries = [
+    print(
+        "\nExact search found nothing."
+    )
 
-        question + " science",
+    print(
+        "Trying one science fallback..."
+    )
 
-        question + " biology",
 
-        question + " facts",
+    results = search_once(
+        question
+        + " science"
+    )
 
-        question + " explanation"
 
+    return results[
+        :MAX_WEBSITES
     ]
 
 
-    for fallback_query in fallback_queries:
-
-        if len(links) >= MAX_WEBSITES:
-            break
-
-
-        results = search_once(
-            fallback_query
-        )
-
-
-        for url in results:
-
-            if url not in links:
-
-                links.append(
-                    url
-                )
-
-
-            if len(links) >= MAX_WEBSITES:
-                break
-
-
-    return links
-
-
 # ======================================================
-# CLEAN WEBPAGE
+# CLEAN HTML
 # ======================================================
 
 def clean_webpage(soup):
@@ -539,15 +597,28 @@ def clean_webpage(soup):
 
 # ======================================================
 # READ ONE WEBSITE
+# MEMORY-OPTIMIZED
 # ======================================================
 
 def read_website(url):
 
-    print("\nReading:")
-    print(url)
+    print(
+        "\nReading:"
+    )
+
+    print(
+        url
+    )
+
+
+    response = None
 
 
     try:
+
+        # --------------------------------------------------
+        # STREAM WEBSITE
+        # --------------------------------------------------
 
         response = requests.get(
 
@@ -555,9 +626,11 @@ def read_website(url):
 
             headers=HEADERS,
 
-            timeout=20,
+            timeout=REQUEST_TIMEOUT,
 
-            allow_redirects=True
+            allow_redirects=True,
+
+            stream=True
 
         )
 
@@ -565,37 +638,117 @@ def read_website(url):
         response.raise_for_status()
 
 
-        print(
-            "Page status:",
-            response.status_code
+        content_type = (
+            response
+            .headers
+            .get(
+                "Content-Type",
+                ""
+            )
+            .lower()
         )
 
 
-        content_type = response.headers.get(
-            "Content-Type",
-            ""
-        ).lower()
-
-
-        # Skip PDFs, images, etc.
+        # Ignore PDFs, images, etc.
         if (
-            "text/html" not in content_type
+            "text/html"
+            not in content_type
             and
             "application/xhtml+xml"
             not in content_type
         ):
 
             print(
-                "Skipped: not an HTML page."
+                "Skipped: not HTML."
             )
+
+
+            response.close()
 
             return ""
 
 
+        # --------------------------------------------------
+        # DOWNLOAD ONLY PART OF PAGE
+        # --------------------------------------------------
+
+        downloaded = bytearray()
+
+
+        for chunk in response.iter_content(
+            chunk_size=8192
+        ):
+
+            if not chunk:
+
+                continue
+
+
+            downloaded.extend(
+                chunk
+            )
+
+
+            # Stop once we reach memory limit
+            if (
+                len(downloaded)
+                >= MAX_DOWNLOAD_BYTES
+            ):
+
+                print(
+                    "Download limit reached."
+                )
+
+                break
+
+
+        # Save encoding before closing response
+        encoding = (
+            response.encoding
+            or "utf-8"
+        )
+
+
+        response.close()
+
+        response = None
+
+
+        print(
+            "HTML bytes downloaded:",
+            len(downloaded)
+        )
+
+
+        # --------------------------------------------------
+        # BYTES → HTML TEXT
+        # --------------------------------------------------
+
+        html = downloaded.decode(
+
+            encoding,
+
+            errors="ignore"
+
+        )
+
+
+        # We no longer need bytearray
+        del downloaded
+
+
+        # --------------------------------------------------
+        # PARSE HTML
+        # --------------------------------------------------
+
         soup = BeautifulSoup(
-            response.text,
+            html,
             "html.parser"
         )
+
+
+        # We no longer need raw HTML string
+        del html
 
 
         soup = clean_webpage(
@@ -603,15 +756,19 @@ def read_website(url):
         )
 
 
-        paragraphs = soup.find_all(
-            "p"
-        )
-
+        # --------------------------------------------------
+        # EXTRACT PARAGRAPHS
+        # --------------------------------------------------
 
         useful_paragraphs = []
 
 
-        for paragraph in paragraphs:
+        current_length = 0
+
+
+        for paragraph in soup.find_all(
+            "p"
+        ):
 
             text = paragraph.get_text(
                 " ",
@@ -619,13 +776,15 @@ def read_website(url):
             )
 
 
+            # Normalize spaces
             text = " ".join(
                 text.split()
             )
 
 
-            # Ignore tiny navigation-like text
+            # Ignore tiny navigation text
             if len(text) < 60:
+
                 continue
 
 
@@ -634,14 +793,32 @@ def read_website(url):
             )
 
 
+            current_length += (
+                len(text)
+            )
+
+
+            # Stop collecting once enough
+            # information has been gathered.
+            if (
+                current_length
+                >= MAX_TEXT_CHARS
+            ):
+
+                break
+
+
+        # --------------------------------------------------
+        # BUILD FINAL PAGE TEXT
+        # --------------------------------------------------
+
         combined_text = " ".join(
             useful_paragraphs
         )
 
 
-        # Limit page size
         combined_text = combined_text[
-            :15000
+            :MAX_TEXT_CHARS
         ]
 
 
@@ -649,6 +826,17 @@ def read_website(url):
             "Characters collected:",
             len(combined_text)
         )
+
+
+        # --------------------------------------------------
+        # FREE MEMORY
+        # --------------------------------------------------
+
+        soup.decompose()
+
+        del soup
+
+        del useful_paragraphs
 
 
         return combined_text
@@ -660,17 +848,35 @@ def read_website(url):
             "Could not read website:"
         )
 
-        print(error)
+        print(
+            error
+        )
+
+
+        # Make sure connection closes
+        if response is not None:
+
+            try:
+
+                response.close()
+
+            except Exception:
+
+                pass
 
 
         return ""
 
 
 # ======================================================
-# COMPLETE RESEARCH PROCESS
+# COMPLETE STEP 1
 # ======================================================
 
 def research_question(question):
+
+    # --------------------------------------------------
+    # FIND TRUSTED PAGES
+    # --------------------------------------------------
 
     websites = search_web(
         question
@@ -694,6 +900,10 @@ def research_question(question):
     research_results = []
 
 
+    # --------------------------------------------------
+    # READ EACH WEBSITE
+    # --------------------------------------------------
+
     for website in websites:
 
         text = read_website(
@@ -712,6 +922,15 @@ def research_question(question):
                     text
 
             })
+
+
+        # Stop when we have enough good pages
+        if (
+            len(research_results)
+            >= MAX_WEBSITES
+        ):
+
+            break
 
 
     print(
@@ -743,7 +962,10 @@ if __name__ == "__main__":
     )
 
 
+    # --------------------------------------------------
     # STEP 1
+    # --------------------------------------------------
+
     results = research_question(
         question
     )
@@ -758,7 +980,10 @@ if __name__ == "__main__":
 
     else:
 
+        # --------------------------------------------------
         # STEP 2
+        # --------------------------------------------------
+
         summary = summarize_research(
 
             results,
@@ -787,6 +1012,10 @@ if __name__ == "__main__":
             summary
         )
 
+
+        # --------------------------------------------------
+        # SOURCES
+        # --------------------------------------------------
 
         print(
             "\n================================="
