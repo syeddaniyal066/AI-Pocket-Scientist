@@ -351,9 +351,7 @@ def ask():
 
         if vision:
 
-            question_lower =
-                question.lower()
-
+            question_lower = question.lower().strip()
 
             generic_image_questions = [
 
@@ -401,11 +399,9 @@ def ask():
                 #
                 # lycaenid butterfly
 
-                research_query =
-                    vision
+                research_query = vision
 
-                summary_question =
-                    vision
+                summary_question = vision
 
 
             # ----------------------------------------------
@@ -438,8 +434,7 @@ def ask():
         # STEP 1
         # ==================================================
 
-        research_results =
-            research_question(
+        research_results =research_question(
                 research_query
             )
 
@@ -467,8 +462,7 @@ def ask():
         # STEP 2
         # ==================================================
 
-        summary =
-            summarize_research(
+        summary = summarize_research(
 
                 research_results,
 
