@@ -1,18 +1,44 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 
+from dotenv import load_dotenv
+
+from perplexity import Perplexity
+from groq import Groq
+
 from research import research_question
 from summarizer import summarize_research
 
+import re
+
 
 # ======================================================
-# CREATE FLASK APP
+# ENVIRONMENT
+# ======================================================
+
+load_dotenv()
+
+
+# Existing API keys are automatically used.
+#
+# PERPLEXITY_API_KEY
+# GROQ_API_KEY
+#
+# NO .env CHANGES REQUIRED.
+
+
+perplexity_client = Perplexity()
+
+groq_client = Groq()
+
+
+# ======================================================
+# FLASK
 # ======================================================
 
 app = Flask(__name__)
 
 
-# Allow Netlify frontend to talk to Render backend
 CORS(
     app,
     resources={r"/*": {"origins": "*"}},
@@ -32,16 +58,159 @@ def home():
 
 
 # ======================================================
-# ASK
+# AI PROMPT
 # ======================================================
 
-@app.route("/ask", methods=["POST"])
+def build_ai_prompt(
+    question,
+    vision=""
+):
+
+    image_context = ""
+
+
+    if vision:
+
+        image_context = f"""
+A local image recognition model identified the uploaded image as:
+{vision}
+
+Use this identification as context.
+Do not say that you personally viewed the image.
+"""
+
+
+    return f"""
+You are AI Pocket Scientist.
+
+{image_context}
+
+RULES:
+- Maximum 25 words.
+- Exactly 2 sentences.
+- No lists.
+- No headings.
+- No markdown.
+- No bullet points.
+- No introduction.
+- Use simple language for school students.
+- Answer the student's actual question.
+- Stop after the second sentence.
+
+Question:
+{question}
+"""
+
+
+# ======================================================
+# PERPLEXITY
+# ======================================================
+
+def ask_perplexity(
+    question,
+    vision=""
+):
+
+    prompt = build_ai_prompt(
+        question,
+        vision
+    )
+
+
+    response = (
+        perplexity_client
+        .chat
+        .completions
+        .create(
+
+            model="sonar",
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+    )
+
+
+    answer = (
+        response
+        .choices[0]
+        .message
+        .content
+    )
+
+
+    # Remove citation numbers
+    answer = re.sub(
+        r"\[\d+\]",
+        "",
+        answer
+    )
+
+
+    return answer.strip()
+
+
+# ======================================================
+# GROQ
+# ======================================================
+
+def ask_groq(
+    question,
+    vision=""
+):
+
+    prompt = build_ai_prompt(
+        question,
+        vision
+    )
+
+
+    response = (
+        groq_client
+        .chat
+        .completions
+        .create(
+
+            model=
+                "llama-3.3-70b-versatile",
+
+            messages=[
+                {
+                    "role": "user",
+                    "content": prompt
+                }
+            ]
+        )
+    )
+
+
+    return (
+        response
+        .choices[0]
+        .message
+        .content
+        .strip()
+    )
+
+
+# ======================================================
+# ASK ENDPOINT
+# ======================================================
+
+@app.route(
+    "/ask",
+    methods=["POST"]
+)
 def ask():
 
     try:
 
         # --------------------------------------------------
-        # RECEIVE DATA FROM JAVASCRIPT
+        # RECEIVE REQUEST
         # --------------------------------------------------
 
         data = request.get_json()
@@ -50,13 +219,10 @@ def ask():
         if not data:
 
             return jsonify({
-                "answer": "No question received."
+                "answer":
+                    "No question received."
             }), 400
 
-
-        # --------------------------------------------------
-        # QUESTION
-        # --------------------------------------------------
 
         question = data.get(
             "question",
@@ -64,42 +230,118 @@ def ask():
         ).strip()
 
 
-        if question == "":
-
-            return jsonify({
-                "answer": "Please enter a question."
-            }), 400
-
-
-        # --------------------------------------------------
-        # VISION RESULT
-        # --------------------------------------------------
-
-        # Example:
-        # lycaenid butterfly
-
         vision = data.get(
             "vision",
             ""
         ).strip()
 
 
-        print("\n===================================")
-        print("QUESTION:")
-        print(question)
+        mode = data.get(
+            "mode",
+            "web"
+        ).strip().lower()
 
-        print("\nVISION:")
+
+        if question == "":
+
+            return jsonify({
+                "answer":
+                    "Please enter a question."
+            }), 400
+
+
         print(
-            vision
-            if vision
-            else "No image"
+            "\n================================="
         )
 
-        print("===================================")
+        print(
+            "MODE:",
+            mode
+        )
+
+        print(
+            "QUESTION:",
+            question
+        )
+
+        print(
+            "VISION:",
+            vision
+        )
+
+        print(
+            "================================="
+        )
 
 
         # ==================================================
-        # DEFAULT
+        # AI MODE
+        # ==================================================
+
+        if mode == "ai":
+
+            try:
+
+                answer = ask_perplexity(
+                    question,
+                    vision
+                )
+
+
+                return jsonify({
+
+                    "answer":
+                        answer,
+
+                    "model":
+                        "Perplexity",
+
+                    "vision":
+                        vision,
+
+                    "mode":
+                        "ai"
+
+                })
+
+
+            except Exception as error:
+
+                print(
+                    "Perplexity Error:",
+                    error
+                )
+
+
+                # ------------------------------------------
+                # GROQ FALLBACK
+                # ------------------------------------------
+
+                answer = ask_groq(
+                    question,
+                    vision
+                )
+
+
+                return jsonify({
+
+                    "answer":
+                        answer,
+
+                    "model":
+                        "Groq",
+
+                    "vision":
+                        vision,
+
+                    "mode":
+                        "ai"
+
+                })
+
+
+        # ==================================================
+        # WEB SEARCH MODE
         # ==================================================
 
         research_query = question
@@ -107,33 +349,11 @@ def ask():
         summary_question = question
 
 
-        # ==================================================
-        # IMAGE EXISTS
-        # ==================================================
-
         if vision:
 
-            question_lower = question.lower()
+            question_lower =
+                question.lower()
 
-
-            # ------------------------------------------------
-            # GENERIC IMAGE QUESTIONS
-            # ------------------------------------------------
-            #
-            # Example:
-            #
-            # "what is this image"
-            # "what is this"
-            # "identify this"
-            #
-            # In these cases we IGNORE the question
-            # for web search.
-            #
-            # We search ONLY:
-            #
-            # lycaenid butterfly
-            #
-            # ------------------------------------------------
 
             generic_image_questions = [
 
@@ -146,6 +366,7 @@ def ask():
 
                 "identify this",
                 "identify that",
+
                 "identify image",
                 "identify the image",
 
@@ -159,40 +380,37 @@ def ask():
 
             is_generic_image_question = any(
 
-                phrase in question_lower
+                phrase
+                in question_lower
 
-                for phrase in generic_image_questions
+                for phrase
+                in generic_image_questions
 
             )
 
 
-            # ==================================================
+            # ----------------------------------------------
             # GENERIC IMAGE QUESTION
-            # ==================================================
+            # ----------------------------------------------
 
             if is_generic_image_question:
 
-                # Search ONLY vision result
-                research_query = vision
+                # Search ONLY the image label
+                #
+                # Example:
+                #
+                # lycaenid butterfly
 
-                # Summarizer also focuses
-                # on vision result
-                summary_question = vision
+                research_query =
+                    vision
+
+                summary_question =
+                    vision
 
 
-            # ==================================================
+            # ----------------------------------------------
             # SPECIFIC IMAGE QUESTION
-            # ==================================================
-            #
-            # Example:
-            #
-            # "Why are this butterfly's wings blue?"
-            #
-            # We need BOTH:
-            #
-            # question + vision
-            #
-            # ==================================================
+            # ----------------------------------------------
 
             else:
 
@@ -210,38 +428,23 @@ def ask():
                 )
 
 
-        # ==================================================
-        # SHOW FINAL QUERY IN RENDER LOGS
-        # ==================================================
-
-        print("\nRESEARCH QUERY:")
-        print(research_query)
-
-
-        print("\nSUMMARY QUESTION:")
-        print(summary_question)
-
-
-        # ==================================================
-        # STEP 1
-        # SEARCH WEBSITES
-        # ==================================================
-
-        research_results = research_question(
+        print(
+            "RESEARCH QUERY:",
             research_query
         )
 
 
         # ==================================================
-        # NO RESULTS
+        # STEP 1
         # ==================================================
 
-        if not research_results:
-
-            print(
-                "\nNO RESEARCH RESULTS FOUND"
+        research_results =
+            research_question(
+                research_query
             )
 
+
+        if not research_results:
 
             return jsonify({
 
@@ -251,42 +454,29 @@ def ask():
                 "vision":
                     vision,
 
-                "research_query":
-                    research_query,
+                "mode":
+                    "web",
 
                 "sources":
-                    [],
-
-                "system":
-                    "AI Pocket Scientist Research Engine"
+                    []
 
             })
 
 
-        print(
-            "\nWEBSITES FOUND:",
-            len(research_results)
-        )
-
-
         # ==================================================
         # STEP 2
-        # OUR OWN SUMMARIZER
         # ==================================================
 
-        summary = summarize_research(
+        summary =
+            summarize_research(
 
-            research_results,
+                research_results,
 
-            summary_question,
+                summary_question,
 
-            3
+                3
 
-        )
-
-
-        print("\nSUMMARY:")
-        print(summary)
+            )
 
 
         # ==================================================
@@ -295,16 +485,16 @@ def ask():
 
         sources = [
 
-            result["url"]
+            item["url"]
 
-            for result in research_results
+            for item
+            in research_results
 
         ]
 
 
         # ==================================================
-        # STEP 3
-        # SEND RESULT TO NETLIFY PAGE
+        # RETURN WEB RESULT
         # ==================================================
 
         return jsonify({
@@ -315,8 +505,8 @@ def ask():
             "vision":
                 vision,
 
-            "research_query":
-                research_query,
+            "mode":
+                "web",
 
             "sources":
                 sources,
@@ -327,29 +517,24 @@ def ask():
         })
 
 
-    # ======================================================
-    # ERROR
-    # ======================================================
-
     except Exception as error:
 
-        print("\nSERVER ERROR:")
-        print(error)
+        print(
+            "SERVER ERROR:",
+            error
+        )
 
 
         return jsonify({
 
             "answer":
-                "Something went wrong while researching your question.",
-
-            "system":
-                "AI Pocket Scientist Research Engine"
+                "Something went wrong while processing your question."
 
         }), 500
 
 
 # ======================================================
-# LOCAL TESTING
+# LOCAL TEST
 # ======================================================
 
 if __name__ == "__main__":

@@ -1,27 +1,19 @@
 // ======================================================
 // AI POCKET SCIENTIST
-//
-// STEP 0:
-// Camera / Upload / Drag & Drop
-// Image → Base64
-//
-// STEP 0.5:
-// Local MobileNet Vision
-//
-// STEP 1:
-// Backend researches websites
-//
-// STEP 2:
-// Python summarizer
-//
-// STEP 3:
-// Show answer
+// WEB SEARCH MODE + AI MODE
 // ======================================================
 
 
 // ======================================================
-// HTML ELEMENTS
+// ELEMENTS
 // ======================================================
+
+const webModeButton =
+    document.getElementById("webModeButton");
+
+const aiModeButton =
+    document.getElementById("aiModeButton");
+
 
 const askButton =
     document.getElementById("askButton");
@@ -31,6 +23,7 @@ const questionInput =
 
 const answerBox =
     document.getElementById("answer");
+
 
 const cameraButton =
     document.getElementById("cameraButton");
@@ -46,6 +39,7 @@ const placeholder =
 
 const previewImage =
     document.getElementById("previewImage");
+
 
 const cameraVideo =
     document.getElementById("cameraVideo");
@@ -67,7 +61,7 @@ const cameraCanvas =
 
 
 // ======================================================
-// RENDER BACKEND
+// BACKEND
 // ======================================================
 
 const API_URL =
@@ -77,6 +71,9 @@ const API_URL =
 // ======================================================
 // VARIABLES
 // ======================================================
+
+// Default mode
+let currentMode = "web";
 
 let isThinking = false;
 
@@ -88,7 +85,53 @@ let visionModel = null;
 
 
 // ======================================================
-// LOAD MOBILENET
+// MODE BUTTONS
+// ======================================================
+
+webModeButton.addEventListener(
+    "click",
+    function () {
+
+        currentMode = "web";
+
+        webModeButton.classList.add(
+            "active"
+        );
+
+        aiModeButton.classList.remove(
+            "active"
+        );
+
+        console.log(
+            "Mode: WEB SEARCH"
+        );
+    }
+);
+
+
+aiModeButton.addEventListener(
+    "click",
+    function () {
+
+        currentMode = "ai";
+
+        aiModeButton.classList.add(
+            "active"
+        );
+
+        webModeButton.classList.remove(
+            "active"
+        );
+
+        console.log(
+            "Mode: AI"
+        );
+    }
+);
+
+
+// ======================================================
+// LOAD VISION
 // ======================================================
 
 async function loadVisionModel() {
@@ -97,29 +140,33 @@ async function loadVisionModel() {
         return visionModel;
     }
 
+
     console.log(
         "Loading vision model..."
     );
 
+
     visionModel =
         await mobilenet.load();
+
 
     console.log(
         "Vision model ready."
     );
+
 
     return visionModel;
 }
 
 
 // ======================================================
-// WAIT UNTIL IMAGE IS READY
+// WAIT FOR IMAGE
 // ======================================================
 
 function waitForImage(image) {
 
     return new Promise(
-        function(resolve, reject) {
+        function (resolve, reject) {
 
             if (
                 image.complete &&
@@ -130,14 +177,12 @@ function waitForImage(image) {
                 return;
             }
 
-            image.onload =
-                function() {
 
-                    resolve();
-                };
+            image.onload = resolve;
+
 
             image.onerror =
-                function() {
+                function () {
 
                     reject(
                         new Error(
@@ -156,76 +201,52 @@ function waitForImage(image) {
 
 async function analyzeImage() {
 
-    // No image = skip vision
     if (!selectedImageBase64) {
+
         return "";
     }
 
-    answerBox.innerHTML =
+
+    answerBox.textContent =
         "👁️ Analyzing image...";
 
-    // Make sure image preview is ready
+
     await waitForImage(
         previewImage
     );
 
-    // Load MobileNet if needed
+
     await loadVisionModel();
 
-    // Analyze the image
+
     const predictions =
         await visionModel.classify(
             previewImage
         );
 
-    console.log(
-        "All vision predictions:"
-    );
 
     console.log(
+        "All vision predictions:",
         predictions
     );
 
-
-    // ==================================================
-    // USE ONLY THE BEST PREDICTION
-    // ==================================================
 
     if (
         !predictions ||
         predictions.length === 0
     ) {
 
-        console.log(
-            "No vision result."
-        );
-
         return "";
     }
 
 
-    // First prediction has highest confidence
+    // Highest-confidence prediction
     const bestPrediction =
         predictions[0];
 
 
-    console.log(
-        "Best prediction:"
-    );
-
-    console.log(
-        bestPrediction
-    );
-
-
-    // MobileNet may return:
-    //
+    // Example:
     // "lycaenid, lycaenid butterfly"
-    //
-    // Split into:
-    //
-    // lycaenid
-    // lycaenid butterfly
 
     const names =
         bestPrediction.className
@@ -236,9 +257,7 @@ async function analyzeImage() {
             );
 
 
-    // Prefer the more descriptive name
-    // by choosing the longest one
-
+    // Pick most descriptive name
     names.sort(
         (a, b) =>
             b.length - a.length
@@ -250,10 +269,7 @@ async function analyzeImage() {
 
 
     console.log(
-        "Image contains:"
-    );
-
-    console.log(
+        "Image contains:",
         bestLabel
     );
 
@@ -263,7 +279,7 @@ async function analyzeImage() {
 
 
 // ======================================================
-// ASK BUTTON
+// ASK
 // ======================================================
 
 askButton.addEventListener(
@@ -271,10 +287,6 @@ askButton.addEventListener(
     askAI
 );
 
-
-// ======================================================
-// MAIN ASK FUNCTION
-// ======================================================
 
 async function askAI() {
 
@@ -289,7 +301,7 @@ async function askAI() {
 
     if (question === "") {
 
-        answerBox.innerHTML =
+        answerBox.textContent =
             "⚠️ Please enter a question.";
 
         return;
@@ -308,9 +320,9 @@ async function askAI() {
         let visionDescription = "";
 
 
-        // ==============================================
-        // OPTIONAL IMAGE ANALYSIS
-        // ==============================================
+        // ----------------------------------------------
+        // SAME VISION SYSTEM FOR BOTH MODES
+        // ----------------------------------------------
 
         if (selectedImageBase64) {
 
@@ -319,13 +331,22 @@ async function askAI() {
         }
 
 
-        // ==============================================
-        // SEND TO BACKEND
-        // ==============================================
+        if (currentMode === "web") {
 
-        answerBox.innerHTML =
-            "🔎 Researching websites...";
+            answerBox.textContent =
+                "🔎 Researching websites...";
+        }
 
+        else {
+
+            answerBox.textContent =
+                "🤖 Asking AI...";
+        }
+
+
+        // ----------------------------------------------
+        // SEND MODE + QUESTION + VISION
+        // ----------------------------------------------
 
         const response =
             await fetch(
@@ -347,7 +368,10 @@ async function askAI() {
                                 question,
 
                             vision:
-                                visionDescription
+                                visionDescription,
+
+                            mode:
+                                currentMode
 
                         })
                 }
@@ -358,35 +382,27 @@ async function askAI() {
             await response.json();
 
 
-        // ==============================================
-        // SHOW ANSWER
-        // ==============================================
-
         if (data.answer) {
 
-            answerBox.innerHTML =
-                data.answer.replace(
-                    /\n/g,
-                    "<br><br>"
-                );
+            answerBox.textContent =
+                data.answer;
         }
 
         else {
 
-            answerBox.innerHTML =
+            answerBox.textContent =
                 "⚠️ No answer received.";
         }
 
 
-        // ==============================================
-        // DEBUG INFORMATION
-        // ==============================================
-
         console.log(
-            "Vision sent to research:"
+            "Mode sent:",
+            currentMode
         );
 
+
         console.log(
+            "Vision sent:",
             visionDescription
         );
 
@@ -394,11 +410,17 @@ async function askAI() {
         if (data.sources) {
 
             console.log(
-                "Research sources:"
+                "Sources:",
+                data.sources
             );
+        }
+
+
+        if (data.model) {
 
             console.log(
-                data.sources
+                "AI model:",
+                data.model
             );
         }
 
@@ -407,11 +429,11 @@ async function askAI() {
     catch (error) {
 
         console.error(
-            "ERROR:",
             error
         );
 
-        answerBox.innerHTML =
+
+        answerBox.textContent =
             "❌ Something went wrong.";
     }
 
@@ -419,11 +441,9 @@ async function askAI() {
 
         isThinking = false;
 
-        askButton.disabled =
-            false;
+        askButton.disabled = false;
 
-        questionInput.disabled =
-            false;
+        questionInput.disabled = false;
 
         questionInput.focus();
     }
@@ -431,16 +451,14 @@ async function askAI() {
 
 
 // ======================================================
-// ENTER KEY
+// ENTER
 // ======================================================
 
 questionInput.addEventListener(
     "keydown",
-    function(event) {
+    function (event) {
 
-        if (
-            event.key === "Enter"
-        ) {
+        if (event.key === "Enter") {
 
             event.preventDefault();
 
@@ -451,7 +469,7 @@ questionInput.addEventListener(
 
 
 // ======================================================
-// CAMERA BUTTON
+// CAMERA
 // ======================================================
 
 cameraButton.addEventListener(
@@ -459,10 +477,6 @@ cameraButton.addEventListener(
     openCamera
 );
 
-
-// ======================================================
-// OPEN CAMERA
-// ======================================================
 
 async function openCamera() {
 
@@ -475,8 +489,7 @@ async function openCamera() {
                     video: {
 
                         facingMode: {
-                            ideal:
-                                "environment"
+                            ideal: "environment"
                         }
                     },
 
@@ -497,7 +510,6 @@ async function openCamera() {
         removeImageButton.style.display =
             "none";
 
-
         cameraVideo.style.display =
             "block";
 
@@ -508,19 +520,19 @@ async function openCamera() {
     catch (error) {
 
         console.error(
-            "Camera error:",
             error
         );
 
+
         alert(
-            "Camera could not be opened. Please allow camera permission or choose an image instead."
+            "Camera could not be opened."
         );
     }
 }
 
 
 // ======================================================
-// TAKE PHOTO BUTTON
+// TAKE PHOTO
 // ======================================================
 
 takePhotoButton.addEventListener(
@@ -528,10 +540,6 @@ takePhotoButton.addEventListener(
     takePhoto
 );
 
-
-// ======================================================
-// TAKE PHOTO
-// ======================================================
 
 function takePhoto() {
 
@@ -565,22 +573,11 @@ function takePhoto() {
     );
 
 
-    // ==============================================
-    // CAMERA IMAGE → BASE64
-    // ==============================================
-
     selectedImageBase64 =
         cameraCanvas.toDataURL(
-
             "image/jpeg",
-
             0.9
         );
-
-
-    console.log(
-        "Camera image converted to Base64."
-    );
 
 
     stopCamera();
@@ -598,9 +595,10 @@ function takePhoto() {
 
 cancelCameraButton.addEventListener(
     "click",
-    function() {
+    function () {
 
         stopCamera();
+
 
         if (selectedImageBase64) {
 
@@ -632,13 +630,12 @@ function stopCamera() {
                     track.stop()
             );
 
-        cameraStream =
-            null;
+
+        cameraStream = null;
     }
 
 
-    cameraVideo.srcObject =
-        null;
+    cameraVideo.srcObject = null;
 
     cameraVideo.style.display =
         "none";
@@ -649,16 +646,17 @@ function stopCamera() {
 
 
 // ======================================================
-// CLICK DROP AREA → FILE PICKER
+// CLICK IMAGE AREA
 // ======================================================
 
 dropZone.addEventListener(
     "click",
-    function() {
+    function () {
 
         if (cameraStream) {
             return;
         }
+
 
         imageInput.click();
     }
@@ -666,19 +664,21 @@ dropZone.addEventListener(
 
 
 // ======================================================
-// FILE SELECTED
+// FILE PICKER
 // ======================================================
 
 imageInput.addEventListener(
     "change",
-    function() {
+    function () {
 
         const file =
             imageInput.files[0];
 
+
         if (!file) {
             return;
         }
+
 
         convertFileToBase64(
             file
@@ -688,12 +688,12 @@ imageInput.addEventListener(
 
 
 // ======================================================
-// DRAG OVER
+// DRAG
 // ======================================================
 
 dropZone.addEventListener(
     "dragover",
-    function(event) {
+    function (event) {
 
         event.preventDefault();
 
@@ -704,13 +704,9 @@ dropZone.addEventListener(
 );
 
 
-// ======================================================
-// DRAG LEAVE
-// ======================================================
-
 dropZone.addEventListener(
     "dragleave",
-    function() {
+    function () {
 
         dropZone.classList.remove(
             "dragging"
@@ -720,14 +716,15 @@ dropZone.addEventListener(
 
 
 // ======================================================
-// DROP IMAGE
+// DROP
 // ======================================================
 
 dropZone.addEventListener(
     "drop",
-    function(event) {
+    function (event) {
 
         event.preventDefault();
+
 
         dropZone.classList.remove(
             "dragging"
@@ -735,8 +732,7 @@ dropZone.addEventListener(
 
 
         const file =
-            event.dataTransfer
-                .files[0];
+            event.dataTransfer.files[0];
 
 
         if (!file) {
@@ -776,7 +772,7 @@ function convertFileToBase64(file) {
 
 
     reader.onload =
-        function(event) {
+        function (event) {
 
             selectedImageBase64 =
                 event.target.result;
@@ -794,11 +790,7 @@ function convertFileToBase64(file) {
 
 
     reader.onerror =
-        function() {
-
-            console.error(
-                "Could not read image."
-            );
+        function () {
 
             alert(
                 "Could not read this image."
@@ -838,7 +830,7 @@ function showImagePreview(
 
 
 // ======================================================
-// SHOW PLACEHOLDER
+// EMPTY IMAGE AREA
 // ======================================================
 
 function showPlaceholder() {
@@ -866,20 +858,16 @@ function showPlaceholder() {
 
 removeImageButton.addEventListener(
     "click",
-    function(event) {
+    function (event) {
 
         event.stopPropagation();
 
-        selectedImageBase64 =
-            "";
 
-        imageInput.value =
-            "";
+        selectedImageBase64 = "";
+
+        imageInput.value = "";
+
 
         showPlaceholder();
-
-        console.log(
-            "Image removed."
-        );
     }
 );

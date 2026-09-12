@@ -1,54 +1,226 @@
 import requests
+
 from bs4 import BeautifulSoup
-from urllib.parse import quote_plus, urlparse, parse_qs
+
+from urllib.parse import (
+    urlparse,
+    parse_qs,
+    unquote
+)
 
 from summarizer import summarize_research
+
+
+# ======================================================
+# AI POCKET SCIENTIST
+# STEP 1 - WEB RESEARCH ENGINE
+#
+# NO CHATBOT
+# NO GEMINI
+# NO GROQ
+# NO PERPLEXITY
+#
+# Question
+#    ↓
+# DuckDuckGo Lite search
+#    ↓
+# Trusted websites only
+#    ↓
+# Read webpage text
+#    ↓
+# summarizer.py
+#    ↓
+# 3-line answer
+# ======================================================
 
 
 # ======================================================
 # SETTINGS
 # ======================================================
 
-# Maximum number of websites we will read
 MAX_WEBSITES = 5
 
 
-# For now, AI Pocket Scientist prefers these
-# science / educational websites.
+# ======================================================
+# TRUSTED DOMAINS
+# ======================================================
+
 TRUSTED_DOMAINS = [
+
+    # -------------------------
+    # GENERAL SCIENCE
+    # -------------------------
+
     "nasa.gov",
     "usgs.gov",
     "noaa.gov",
+    "nsf.gov",
+    "energy.gov",
+    "epa.gov",
+
+    "nih.gov",
+    "ncbi.nlm.nih.gov",
+    "medlineplus.gov",
+    "cdc.gov",
+
+    "who.int",
+    "esa.int",
+    "cern.ch",
+
+
+    # -------------------------
+    # UNIVERSITIES
+    # -------------------------
+
+    "mit.edu",
+    "harvard.edu",
+    "stanford.edu",
+    "berkeley.edu",
+    "caltech.edu",
+
+    "cam.ac.uk",
+    "ox.ac.uk",
+
+
+    # -------------------------
+    # EDUCATION
+    # -------------------------
+
+    "khanacademy.org",
+    "openstax.org",
+    "physicsclassroom.com",
+    "ck12.org",
+
+    "libretexts.org",
+
+
+    # -------------------------
+    # ENCYCLOPEDIAS
+    # -------------------------
+
     "britannica.com",
+    "wikipedia.org",
+
+
+    # -------------------------
+    # GENERAL SCIENCE / NATURE
+    # -------------------------
+
     "nationalgeographic.com",
     "smithsonianmag.com",
+    "si.edu",
+    "amnh.org",
+
     "sciencenews.org",
-    "wikipedia.org"
+    "livescience.com",
+    "scientificamerican.com",
+
+    "nature.com",
+    "science.org",
+    "pnas.org",
+    "royalsociety.org",
+
+
+    # -------------------------
+    # HEALTH / HUMAN BODY
+    # -------------------------
+
+    "kidshealth.org",
+    "mayoclinic.org",
+    "clevelandclinic.org",
+
+
+    # -------------------------
+    # ANIMAL / WILDLIFE
+    # -------------------------
+
+    "animaldiversity.org",
+    "gbif.org",
+    "eol.org",
+    "iucnredlist.org",
+    "mammaldiversity.org",
+
+    "allaboutbirds.org",
+    "ebird.org",
+    "audubon.org",
+
+    "bugguide.net",
+    "butterfliesandmoths.org",
+    "xerces.org",
+    "butterfly-conservation.org",
+    "monarchjointventure.org",
+
+    "fishbase.se",
+    "marinespecies.org",
+
+    "reptile-database.reptarium.cz",
+    "amphibiaweb.org",
+
+    "sandiegozoowildlifealliance.org",
+    "worldwildlife.org",
+    "inaturalist.org"
 ]
 
 
 # ======================================================
-# CHECK WHETHER A WEBSITE IS TRUSTED
+# HEADERS
+# ======================================================
+
+HEADERS = {
+
+    "User-Agent":
+        "Mozilla/5.0 "
+        "(Windows NT 10.0; Win64; x64) "
+        "AppleWebKit/537.36 "
+        "(KHTML, like Gecko) "
+        "Chrome/120.0 Safari/537.36",
+
+    "Accept":
+        "text/html,application/xhtml+xml,"
+        "application/xml;q=0.9,*/*;q=0.8",
+
+    "Accept-Language":
+        "en-US,en;q=0.9"
+
+}
+
+
+# ======================================================
+# CHECK WHETHER URL IS TRUSTED
 # ======================================================
 
 def is_trusted_url(url):
 
     try:
 
-        domain = urlparse(url).netloc.lower()
+        parsed = urlparse(url)
+
+        domain = parsed.netloc.lower()
+
+        # Remove port if any
+        domain = domain.split(":")[0]
 
         # Remove www.
-        domain = domain.replace("www.", "")
+        if domain.startswith("www."):
 
-        for trusted_domain in TRUSTED_DOMAINS:
+            domain = domain[4:]
 
-            if (
-                domain == trusted_domain
-                or domain.endswith("." + trusted_domain)
-            ):
+
+        for trusted in TRUSTED_DOMAINS:
+
+            if domain == trusted:
                 return True
 
+
+            if domain.endswith(
+                "." + trusted
+            ):
+
+                return True
+
+
         return False
+
 
     except Exception:
 
@@ -56,45 +228,104 @@ def is_trusted_url(url):
 
 
 # ======================================================
-# SEARCH WEB
+# GET REAL URL FROM DUCKDUCKGO REDIRECT
 # ======================================================
 
-def search_web(question):
+def get_real_url(url):
 
-    print("\nSearching for:")
-    print(question)
+    if not url:
 
-    # Convert spaces and special characters
-    # so the question can be used inside a URL.
-    search_question = quote_plus(question)
-
-    search_url = (
-        "https://html.duckduckgo.com/html/"
-        f"?q={search_question}"
-    )
-
-
-    # Makes our request look like a normal browser.
-    headers = {
-
-        "User-Agent":
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "Chrome/120.0 Safari/537.36"
-
-    }
+        return ""
 
 
     try:
 
-        response = requests.get(
+        # Sometimes DuckDuckGo gives:
+        #
+        # //duckduckgo.com/l/?uddg=https%3A%2F%2F...
+        #
+        # or:
+        #
+        # https://duckduckgo.com/l/?uddg=...
+
+        if url.startswith("//"):
+
+            url = "https:" + url
+
+
+        parsed = urlparse(url)
+
+
+        if (
+            "duckduckgo.com" in parsed.netloc
+            and
+            "uddg=" in parsed.query
+        ):
+
+            params = parse_qs(
+                parsed.query
+            )
+
+
+            real_url = params.get(
+                "uddg"
+            )
+
+
+            if real_url:
+
+                return unquote(
+                    real_url[0]
+                )
+
+
+        return url
+
+
+    except Exception:
+
+        return url
+
+
+# ======================================================
+# SEARCH DUCKDUCKGO LITE
+# ======================================================
+
+def search_once(search_query):
+
+    print("\nTrying search:")
+    print(search_query)
+
+
+    search_url = (
+        "https://lite.duckduckgo.com/lite/"
+    )
+
+
+    try:
+
+        response = requests.post(
+
             search_url,
-            headers=headers,
-            timeout=10
+
+            data={
+                "q": search_query
+            },
+
+            headers=HEADERS,
+
+            timeout=20
+
         )
 
+
         response.raise_for_status()
+
+
+        print(
+            "DuckDuckGo status:",
+            response.status_code
+        )
 
 
         soup = BeautifulSoup(
@@ -106,51 +337,56 @@ def search_web(question):
         links = []
 
 
-        # Find search-result links.
-        search_results = soup.select(
-            ".result__a"
-        )
+        # Look at every link returned by DDG Lite
+        for tag in soup.find_all("a"):
+
+            href = tag.get(
+                "href"
+            )
 
 
-        for result in search_results:
-
-            url = result.get("href")
-
-            if not url:
+            if not href:
                 continue
 
 
-            # DuckDuckGo sometimes gives us
-            # a redirect instead of the real URL.
-            if "uddg=" in url:
+            real_url = get_real_url(
+                href
+            )
 
-                parsed_url = urlparse(url)
 
-                parameters = parse_qs(
-                    parsed_url.query
+            if not real_url:
+                continue
+
+
+            if not real_url.startswith(
+                ("http://", "https://")
+            ):
+                continue
+
+
+            if not is_trusted_url(
+                real_url
+            ):
+                continue
+
+
+            if real_url not in links:
+
+                links.append(
+                    real_url
                 )
 
-                real_url = parameters.get(
-                    "uddg"
+
+                print(
+                    "Found trusted result:",
+                    real_url
                 )
 
-                if real_url:
 
-                    url = real_url[0]
-
-
-            # Only accept our trusted websites.
-            if is_trusted_url(url):
-
-                if url not in links:
-
-                    links.append(url)
-
-
-            # Stop after enough websites.
-            if len(links) >= MAX_WEBSITES:
-
-                break
+        print(
+            "Trusted results from this search:",
+            len(links)
+        )
 
 
         return links
@@ -159,11 +395,146 @@ def search_web(question):
     except Exception as error:
 
         print(
-            "Search error:",
-            error
+            "Search error:"
         )
 
+        print(error)
+
+
         return []
+
+
+# ======================================================
+# SEARCH WEB
+# ======================================================
+
+def search_web(question):
+
+    print(
+        "\n================================="
+    )
+
+    print(
+        "SEARCHING WEB"
+    )
+
+    print(
+        "================================="
+    )
+
+
+    print(
+        "Original query:"
+    )
+
+    print(
+        question
+    )
+
+
+    links = []
+
+
+    # --------------------------------------------------
+    # 1. EXACT SEARCH
+    # --------------------------------------------------
+
+    exact_results = search_once(
+        question
+    )
+
+
+    for url in exact_results:
+
+        if url not in links:
+
+            links.append(
+                url
+            )
+
+
+        if len(links) >= MAX_WEBSITES:
+
+            return links
+
+
+    # --------------------------------------------------
+    # 2. FALLBACK SEARCHES
+    # --------------------------------------------------
+
+    fallback_queries = [
+
+        question + " science",
+
+        question + " biology",
+
+        question + " facts",
+
+        question + " explanation"
+
+    ]
+
+
+    for fallback_query in fallback_queries:
+
+        if len(links) >= MAX_WEBSITES:
+            break
+
+
+        results = search_once(
+            fallback_query
+        )
+
+
+        for url in results:
+
+            if url not in links:
+
+                links.append(
+                    url
+                )
+
+
+            if len(links) >= MAX_WEBSITES:
+                break
+
+
+    return links
+
+
+# ======================================================
+# CLEAN WEBPAGE
+# ======================================================
+
+def clean_webpage(soup):
+
+    unwanted_tags = [
+
+        "script",
+        "style",
+        "nav",
+        "footer",
+        "header",
+        "aside",
+        "form",
+        "noscript",
+        "button",
+        "svg",
+        "iframe"
+
+    ]
+
+
+    for tag_name in unwanted_tags:
+
+        for tag in soup.find_all(
+            tag_name
+        ):
+
+            tag.decompose()
+
+
+    return soup
 
 
 # ======================================================
@@ -176,26 +547,49 @@ def read_website(url):
     print(url)
 
 
-    headers = {
-
-        "User-Agent":
-        "Mozilla/5.0 "
-        "(Windows NT 10.0; Win64; x64) "
-        "AppleWebKit/537.36 "
-        "Chrome/120.0 Safari/537.36"
-
-    }
-
-
     try:
 
         response = requests.get(
+
             url,
-            headers=headers,
-            timeout=10
+
+            headers=HEADERS,
+
+            timeout=20,
+
+            allow_redirects=True
+
         )
 
+
         response.raise_for_status()
+
+
+        print(
+            "Page status:",
+            response.status_code
+        )
+
+
+        content_type = response.headers.get(
+            "Content-Type",
+            ""
+        ).lower()
+
+
+        # Skip PDFs, images, etc.
+        if (
+            "text/html" not in content_type
+            and
+            "application/xhtml+xml"
+            not in content_type
+        ):
+
+            print(
+                "Skipped: not an HTML page."
+            )
+
+            return ""
 
 
         soup = BeautifulSoup(
@@ -204,24 +598,14 @@ def read_website(url):
         )
 
 
-        # Remove unnecessary parts of webpage.
-        for tag in soup(
-            [
-                "script",
-                "style",
-                "nav",
-                "footer",
-                "header",
-                "aside",
-                "form"
-            ]
-        ):
-
-            tag.decompose()
+        soup = clean_webpage(
+            soup
+        )
 
 
-        # Find paragraphs.
-        paragraphs = soup.find_all("p")
+        paragraphs = soup.find_all(
+            "p"
+        )
 
 
         useful_paragraphs = []
@@ -235,34 +619,49 @@ def read_website(url):
             )
 
 
-            # Skip very short text.
-            if len(text) >= 80:
-
-                useful_paragraphs.append(
-                    text
-                )
+            text = " ".join(
+                text.split()
+            )
 
 
-        # Combine all useful paragraphs.
-        page_text = " ".join(
+            # Ignore tiny navigation-like text
+            if len(text) < 60:
+                continue
+
+
+            useful_paragraphs.append(
+                text
+            )
+
+
+        combined_text = " ".join(
             useful_paragraphs
         )
 
 
-        # Don't allow one website to produce
-        # an enormous amount of text.
-        page_text = page_text[:12000]
+        # Limit page size
+        combined_text = combined_text[
+            :15000
+        ]
 
 
-        return page_text
+        print(
+            "Characters collected:",
+            len(combined_text)
+        )
+
+
+        return combined_text
 
 
     except Exception as error:
 
         print(
-            "Could not read website:",
-            error
+            "Could not read website:"
         )
+
+        print(error)
+
 
         return ""
 
@@ -273,21 +672,28 @@ def read_website(url):
 
 def research_question(question):
 
-    # First search for websites.
-    websites = search_web(question)
+    websites = search_web(
+        question
+    )
 
 
     print(
-        "\nFound",
-        len(websites),
-        "trusted website(s)."
+        "\n================================="
+    )
+
+    print(
+        "TRUSTED WEBSITES FOUND:",
+        len(websites)
+    )
+
+    print(
+        "================================="
     )
 
 
     research_results = []
 
 
-    # Read each website.
     for website in websites:
 
         text = read_website(
@@ -297,92 +703,109 @@ def research_question(question):
 
         if text:
 
-            research_results.append(
-                {
-                    "url": website,
-                    "text": text
-                }
-            )
+            research_results.append({
+
+                "url":
+                    website,
+
+                "text":
+                    text
+
+            })
+
+
+    print(
+        "\n================================="
+    )
+
+    print(
+        "USEFUL WEBSITES READ:",
+        len(research_results)
+    )
+
+    print(
+        "================================="
+    )
 
 
     return research_results
 
 
 # ======================================================
-# TEST PROGRAM
+# LOCAL TEST
+# STEP 1 + STEP 2
 # ======================================================
 
 if __name__ == "__main__":
 
     question = input(
-        "\nAsk a science question: "
+        "\nEnter research question: "
     )
 
 
+    # STEP 1
     results = research_question(
         question
     )
 
-    summary = summarize_research(
-        results,
-        question,
-        3
-    )
 
-    print(
-        "\n\n=============================="
-    )
-
-    print(
-        "3-LINE SUMMARY"
-    )
-
-    print(
-    "=============================="
-)
-
-    print(summary)
-
-
-
-    print(
-        "\n\n=============================="
-    )
-
-    print(
-        "RESEARCH RESULTS"
-    )
-
-    print(
-        "=============================="
-    )
-
-
-    for number, result in enumerate(
-        results,
-        start=1
-    ):
+    if not results:
 
         print(
-            f"\nWEBSITE {number}"
-        )
-
-        print(
-            result["url"]
-        )
-
-        print(
-            "\n"
+            "\nNo useful information found."
         )
 
 
-        # For testing, only show first
-        # 1000 characters from each website.
-        print(
-            result["text"][:1000]
+    else:
+
+        # STEP 2
+        summary = summarize_research(
+
+            results,
+
+            question,
+
+            3
+
         )
 
 
         print(
-            "\n------------------------------"
+            "\n\n================================="
         )
+
+        print(
+            "3-LINE ANSWER"
+        )
+
+        print(
+            "================================="
+        )
+
+
+        print(
+            summary
+        )
+
+
+        print(
+            "\n================================="
+        )
+
+        print(
+            "SOURCES"
+        )
+
+        print(
+            "================================="
+        )
+
+
+        for number, result in enumerate(
+            results,
+            start=1
+        ):
+
+            print(
+                f"{number}. {result['url']}"
+            )
