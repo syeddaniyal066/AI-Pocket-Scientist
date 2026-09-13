@@ -358,23 +358,43 @@ async function askAI() {
 
     try {
 
-        let visionDescription = "";
-
         // ----------------------------------------------
-        // LOCAL IMAGE IDENTIFICATION
+        // STATUS
         // ----------------------------------------------
 
         if (selectedImageBase64) {
 
-            visionDescription =
-                await analyzeImage();
+            answerBox.textContent =
+                "👁️ Reading image...";
+
+        } else {
+
+            answerBox.textContent =
+                "🤖 Asking AI...";
         }
 
-        answerBox.textContent =
-            "🤖 Asking AI...";
 
         // ----------------------------------------------
-        // SEND QUESTION + VISION
+        // DEBUG
+        // ----------------------------------------------
+
+        console.log(
+            "Image attached:",
+            selectedImageBase64
+                ? "YES"
+                : "NO"
+        );
+
+        console.log(
+            "Image size:",
+            selectedImageBase64
+                ? selectedImageBase64.length
+                : 0
+        );
+
+
+        // ----------------------------------------------
+        // SEND QUESTION + ACTUAL IMAGE
         // ----------------------------------------------
 
         const response =
@@ -396,32 +416,57 @@ async function askAI() {
                             question:
                                 question,
 
+                            image:
+                                selectedImageBase64,
+
                             vision:
-                                visionDescription
+                                ""
 
                         })
                 }
             );
 
+
+        console.log(
+            "Response status:",
+            response.status
+        );
+
+
+        // ----------------------------------------------
+        // RESPONSE
+        // ----------------------------------------------
+
         const data =
             await response.json();
+
+
+        if (!response.ok) {
+
+            console.error(
+                "Server error:",
+                data
+            );
+
+            answerBox.textContent =
+                data.answer ||
+                "❌ Something went wrong.";
+
+            return;
+        }
+
 
         if (data.answer) {
 
             answerBox.textContent =
                 data.answer;
-        }
 
-        else {
+        } else {
 
             answerBox.textContent =
                 "⚠️ No answer received.";
         }
 
-        console.log(
-            "Vision sent:",
-            visionDescription
-        );
 
         if (data.model) {
 
@@ -436,11 +481,12 @@ async function askAI() {
     catch (error) {
 
         console.error(
+            "Ask AI Error:",
             error
         );
 
         answerBox.textContent =
-            "❌ Something went wrong.";
+            "❌ Unable to connect to AI server.";
     }
 
     finally {
