@@ -33,84 +33,6 @@ body {
 
 
 /* ======================================================
-   MODE BAR
-====================================================== */
-
-.mode-bar {
-
-    width: 100%;
-
-    background: #8dd3e5;
-
-    border: 8px solid #4348ce;
-
-    border-radius: 8px;
-
-    padding: 14px;
-
-    margin-bottom: 22px;
-
-    display: flex;
-
-    justify-content: center;
-
-    gap: 80px;
-
-}
-
-
-.mode-button {
-
-    width: 34%;
-
-    min-width: 190px;
-
-    padding: 13px 20px;
-
-    border: 3px solid #4348ce;
-
-    border-radius: 14px;
-
-    background: transparent;
-
-    color: #343bbd;
-
-    font-size: 18px;
-
-    font-weight: bold;
-
-    cursor: pointer;
-
-    transition: 0.2s;
-
-}
-
-
-.mode-button:hover {
-
-    background: rgba(
-        255,
-        255,
-        255,
-        0.35
-    );
-
-}
-
-
-.mode-button.active {
-
-    background: #2563eb;
-
-    color: white;
-
-    border-color: #2563eb;
-
-}
-
-
-
-/* ======================================================
    APP
 ====================================================== */
 
@@ -515,26 +437,6 @@ h1 {
     body {
 
         padding: 12px;
-
-    }
-
-
-    .mode-bar {
-
-        gap: 10px;
-
-        padding: 10px;
-
-    }
-
-
-    .mode-button {
-
-        width: 50%;
-
-        min-width: 0;
-
-        font-size: 15px;
 
     }
 

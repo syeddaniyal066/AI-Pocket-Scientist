@@ -1,19 +1,12 @@
 // ======================================================
 // AI POCKET SCIENTIST
-// WEB SEARCH MODE + AI MODE
+// AI MODE ONLY
 // ======================================================
 
 
 // ======================================================
 // ELEMENTS
 // ======================================================
-
-const webModeButton =
-    document.getElementById("webModeButton");
-
-const aiModeButton =
-    document.getElementById("aiModeButton");
-
 
 const askButton =
     document.getElementById("askButton");
@@ -72,9 +65,6 @@ const API_URL =
 // VARIABLES
 // ======================================================
 
-// Default mode
-let currentMode = "web";
-
 let isThinking = false;
 
 let selectedImageBase64 = "";
@@ -82,52 +72,6 @@ let selectedImageBase64 = "";
 let cameraStream = null;
 
 let visionModel = null;
-
-
-// ======================================================
-// MODE BUTTONS
-// ======================================================
-
-webModeButton.addEventListener(
-    "click",
-    function () {
-
-        currentMode = "web";
-
-        webModeButton.classList.add(
-            "active"
-        );
-
-        aiModeButton.classList.remove(
-            "active"
-        );
-
-        console.log(
-            "Mode: WEB SEARCH"
-        );
-    }
-);
-
-
-aiModeButton.addEventListener(
-    "click",
-    function () {
-
-        currentMode = "ai";
-
-        aiModeButton.classList.add(
-            "active"
-        );
-
-        webModeButton.classList.remove(
-            "active"
-        );
-
-        console.log(
-            "Mode: AI"
-        );
-    }
-);
 
 
 // ======================================================
@@ -140,20 +84,16 @@ async function loadVisionModel() {
         return visionModel;
     }
 
-
     console.log(
         "Loading vision model..."
     );
 
-
     visionModel =
         await mobilenet.load();
-
 
     console.log(
         "Vision model ready."
     );
-
 
     return visionModel;
 }
@@ -177,9 +117,7 @@ function waitForImage(image) {
                 return;
             }
 
-
             image.onload = resolve;
-
 
             image.onerror =
                 function () {
@@ -206,30 +144,24 @@ async function analyzeImage() {
         return "";
     }
 
-
     answerBox.textContent =
         "👁️ Analyzing image...";
-
 
     await waitForImage(
         previewImage
     );
 
-
     await loadVisionModel();
-
 
     const predictions =
         await visionModel.classify(
             previewImage
         );
 
-
     console.log(
         "All vision predictions:",
         predictions
     );
-
 
     if (
         !predictions ||
@@ -239,15 +171,12 @@ async function analyzeImage() {
         return "";
     }
 
-
     // Highest-confidence prediction
     const bestPrediction =
         predictions[0];
 
-
     // Example:
     // "lycaenid, lycaenid butterfly"
-
     const names =
         bestPrediction.className
             .split(",")
@@ -256,23 +185,19 @@ async function analyzeImage() {
                     name.trim()
             );
 
-
     // Pick most descriptive name
     names.sort(
         (a, b) =>
             b.length - a.length
     );
 
-
     const bestLabel =
         names[0];
-
 
     console.log(
         "Image contains:",
         bestLabel
     );
-
 
     return bestLabel;
 }
@@ -294,10 +219,8 @@ async function askAI() {
         return;
     }
 
-
     const question =
         questionInput.value.trim();
-
 
     if (question === "") {
 
@@ -307,21 +230,18 @@ async function askAI() {
         return;
     }
 
-
     isThinking = true;
 
     askButton.disabled = true;
 
     questionInput.disabled = true;
 
-
     try {
 
         let visionDescription = "";
 
-
         // ----------------------------------------------
-        // SAME VISION SYSTEM FOR BOTH MODES
+        // LOCAL IMAGE IDENTIFICATION
         // ----------------------------------------------
 
         if (selectedImageBase64) {
@@ -330,22 +250,11 @@ async function askAI() {
                 await analyzeImage();
         }
 
-
-        if (currentMode === "web") {
-
-            answerBox.textContent =
-                "🔎 Researching websites...";
-        }
-
-        else {
-
-            answerBox.textContent =
-                "🤖 Asking AI...";
-        }
-
+        answerBox.textContent =
+            "🤖 Asking AI...";
 
         // ----------------------------------------------
-        // SEND MODE + QUESTION + VISION
+        // SEND QUESTION + VISION
         // ----------------------------------------------
 
         const response =
@@ -368,19 +277,14 @@ async function askAI() {
                                 question,
 
                             vision:
-                                visionDescription,
-
-                            mode:
-                                currentMode
+                                visionDescription
 
                         })
                 }
             );
 
-
         const data =
             await response.json();
-
 
         if (data.answer) {
 
@@ -394,27 +298,10 @@ async function askAI() {
                 "⚠️ No answer received.";
         }
 
-
-        console.log(
-            "Mode sent:",
-            currentMode
-        );
-
-
         console.log(
             "Vision sent:",
             visionDescription
         );
-
-
-        if (data.sources) {
-
-            console.log(
-                "Sources:",
-                data.sources
-            );
-        }
-
 
         if (data.model) {
 
@@ -431,7 +318,6 @@ async function askAI() {
         console.error(
             error
         );
-
 
         answerBox.textContent =
             "❌ Something went wrong.";
@@ -496,10 +382,8 @@ async function openCamera() {
                     audio: false
                 });
 
-
         cameraVideo.srcObject =
             cameraStream;
-
 
         previewImage.style.display =
             "none";
@@ -522,7 +406,6 @@ async function openCamera() {
         console.error(
             error
         );
-
 
         alert(
             "Camera could not be opened."
@@ -547,19 +430,16 @@ function takePhoto() {
         return;
     }
 
-
     cameraCanvas.width =
         cameraVideo.videoWidth;
 
     cameraCanvas.height =
         cameraVideo.videoHeight;
 
-
     const context =
         cameraCanvas.getContext(
             "2d"
         );
-
 
     context.drawImage(
 
@@ -572,16 +452,13 @@ function takePhoto() {
         cameraCanvas.height
     );
 
-
     selectedImageBase64 =
         cameraCanvas.toDataURL(
             "image/jpeg",
             0.9
         );
 
-
     stopCamera();
-
 
     showImagePreview(
         selectedImageBase64
@@ -598,7 +475,6 @@ cancelCameraButton.addEventListener(
     function () {
 
         stopCamera();
-
 
         if (selectedImageBase64) {
 
@@ -630,10 +506,8 @@ function stopCamera() {
                     track.stop()
             );
 
-
         cameraStream = null;
     }
-
 
     cameraVideo.srcObject = null;
 
@@ -657,7 +531,6 @@ dropZone.addEventListener(
             return;
         }
 
-
         imageInput.click();
     }
 );
@@ -674,11 +547,9 @@ imageInput.addEventListener(
         const file =
             imageInput.files[0];
 
-
         if (!file) {
             return;
         }
-
 
         convertFileToBase64(
             file
@@ -725,20 +596,16 @@ dropZone.addEventListener(
 
         event.preventDefault();
 
-
         dropZone.classList.remove(
             "dragging"
         );
 
-
         const file =
             event.dataTransfer.files[0];
-
 
         if (!file) {
             return;
         }
-
 
         convertFileToBase64(
             file
@@ -766,10 +633,8 @@ function convertFileToBase64(file) {
         return;
     }
 
-
     const reader =
         new FileReader();
-
 
     reader.onload =
         function (event) {
@@ -777,17 +642,14 @@ function convertFileToBase64(file) {
             selectedImageBase64 =
                 event.target.result;
 
-
             console.log(
                 "Image converted to Base64."
             );
-
 
             showImagePreview(
                 selectedImageBase64
             );
         };
-
 
     reader.onerror =
         function () {
@@ -796,7 +658,6 @@ function convertFileToBase64(file) {
                 "Could not read this image."
             );
         };
-
 
     reader.readAsDataURL(
         file
@@ -862,11 +723,9 @@ removeImageButton.addEventListener(
 
         event.stopPropagation();
 
-
         selectedImageBase64 = "";
 
         imageInput.value = "";
-
 
         showPlaceholder();
     }

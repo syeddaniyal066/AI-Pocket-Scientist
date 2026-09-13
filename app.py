@@ -1,15 +1,19 @@
+import os
+import re
+
 from flask import Flask, request, jsonify
 from flask_cors import CORS
-
 from dotenv import load_dotenv
 
-from perplexity import Perplexity
-from groq import Groq
+try:
+    from perplexity import Perplexity
+except Exception:
+    Perplexity = None
 
-from research import research_question
-from summarizer import summarize_research
-
-import re
+try:
+    from groq import Groq
+except Exception:
+    Groq = None
 
 
 # ======================================================
@@ -18,7 +22,6 @@ import re
 
 load_dotenv()
 
-
 # Existing API keys are automatically used.
 #
 # PERPLEXITY_API_KEY
@@ -26,10 +29,20 @@ load_dotenv()
 #
 # NO .env CHANGES REQUIRED.
 
+PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 
-perplexity_client = Perplexity()
+perplexity_client = (
+    Perplexity(api_key=PERPLEXITY_API_KEY)
+    if Perplexity and PERPLEXITY_API_KEY
+    else None
+)
 
-groq_client = Groq()
+groq_client = (
+    Groq(api_key=GROQ_API_KEY)
+    if Groq and GROQ_API_KEY
+    else None
+)
 
 
 # ======================================================
@@ -37,7 +50,6 @@ groq_client = Groq()
 # ======================================================
 
 app = Flask(__name__)
-
 
 CORS(
     app,
@@ -53,7 +65,6 @@ CORS(
 
 @app.route("/")
 def home():
-
     return "AI Pocket Scientist Server Running!"
 
 
@@ -61,16 +72,10 @@ def home():
 # AI PROMPT
 # ======================================================
 
-def build_ai_prompt(
-    question,
-    vision=""
-):
-
+def build_ai_prompt(question, vision=""):
     image_context = ""
 
-
     if vision:
-
         image_context = f"""
 A local image recognition model identified the uploaded image as:
 {vision}
@@ -78,7 +83,6 @@ A local image recognition model identified the uploaded image as:
 Use this identification as context.
 Do not say that you personally viewed the image.
 """
-
 
     return f"""
 You are AI Pocket Scientist.
@@ -106,25 +110,15 @@ Question:
 # PERPLEXITY
 # ======================================================
 
-def ask_perplexity(
-    question,
-    vision=""
-):
-
-    prompt = build_ai_prompt(
-        question,
-        vision
-    )
-
+def ask_perplexity(question, vision=""):
+    prompt = build_ai_prompt(question, vision)
 
     response = (
         perplexity_client
         .chat
         .completions
         .create(
-
             model="sonar",
-
             messages=[
                 {
                     "role": "user",
@@ -133,7 +127,6 @@ def ask_perplexity(
             ]
         )
     )
-
 
     answer = (
         response
@@ -142,42 +135,29 @@ def ask_perplexity(
         .content
     )
 
-
-    # Remove citation numbers
+    # Remove citation numbers such as [1], [2], etc.
     answer = re.sub(
         r"\[\d+\]",
         "",
         answer
     )
 
-
     return answer.strip()
 
 
 # ======================================================
-# GROQ
+# GROQ FALLBACK
 # ======================================================
 
-def ask_groq(
-    question,
-    vision=""
-):
-
-    prompt = build_ai_prompt(
-        question,
-        vision
-    )
-
+def ask_groq(question, vision=""):
+    prompt = build_ai_prompt(question, vision)
 
     response = (
         groq_client
         .chat
         .completions
         .create(
-
-            model=
-                "llama-3.3-70b-versatile",
-
+            model="llama-3.3-70b-versatile",
             messages=[
                 {
                     "role": "user",
@@ -186,7 +166,6 @@ def ask_groq(
             ]
         )
     )
-
 
     return (
         response
@@ -206,324 +185,97 @@ def ask_groq(
     methods=["POST"]
 )
 def ask():
-
     try:
-
-        # --------------------------------------------------
-        # RECEIVE REQUEST
-        # --------------------------------------------------
-
-        data = request.get_json()
-
+        data = request.get_json(silent=True)
 
         if not data:
-
             return jsonify({
-                "answer":
-                    "No question received."
+                "answer": "No question received."
             }), 400
 
-
-        question = data.get(
-            "question",
-            ""
+        question = str(
+            data.get("question", "")
         ).strip()
 
-
-        vision = data.get(
-            "vision",
-            ""
+        vision = str(
+            data.get("vision", "")
         ).strip()
-
-
-        mode = data.get(
-            "mode",
-            "web"
-        ).strip().lower()
-
 
         if question == "":
-
             return jsonify({
-                "answer":
-                    "Please enter a question."
+                "answer": "Please enter a question."
             }), 400
 
+        print("\n=================================")
+        print("QUESTION:", question)
+        print("VISION:", vision)
+        print("=================================")
 
-        print(
-            "\n================================="
-        )
-
-        print(
-            "MODE:",
-            mode
-        )
-
-        print(
-            "QUESTION:",
-            question
-        )
-
-        print(
-            "VISION:",
-            vision
-        )
-
-        print(
-            "================================="
-        )
-
+        if not perplexity_client and not groq_client:
+            return jsonify({
+                "answer": "AI service is not configured on this server.",
+                "vision": vision
+            }), 503
 
         # ==================================================
-        # AI MODE
+        # PRIMARY: PERPLEXITY
         # ==================================================
 
-        if mode == "ai":
-
+        if perplexity_client:
             try:
-
                 answer = ask_perplexity(
                     question,
                     vision
                 )
 
-
                 return jsonify({
-
-                    "answer":
-                        answer,
-
-                    "model":
-                        "Perplexity",
-
-                    "vision":
-                        vision,
-
-                    "mode":
-                        "ai"
-
+                    "answer": answer,
+                    "model": "Perplexity",
+                    "vision": vision
                 })
 
-
             except Exception as error:
-
                 print(
                     "Perplexity Error:",
                     error
                 )
 
+        # ==================================================
+        # FALLBACK: GROQ
+        # ==================================================
 
-                # ------------------------------------------
-                # GROQ FALLBACK
-                # ------------------------------------------
-
+        if groq_client:
+            try:
                 answer = ask_groq(
                     question,
                     vision
                 )
 
-
                 return jsonify({
-
-                    "answer":
-                        answer,
-
-                    "model":
-                        "Groq",
-
-                    "vision":
-                        vision,
-
-                    "mode":
-                        "ai"
-
+                    "answer": answer,
+                    "model": "Groq",
+                    "vision": vision
                 })
 
-
-        # ==================================================
-        # WEB SEARCH MODE
-        # ==================================================
-
-        research_query = question
-
-        summary_question = question
-
-
-        if vision:
-
-            question_lower = question.lower().strip()
-
-            generic_image_questions = [
-
-                "what is this",
-                "what is this image",
-                "what is that",
-                "what is that image",
-                "what's this",
-                "what's that",
-
-                "identify this",
-                "identify that",
-
-                "identify image",
-                "identify the image",
-
-                "what animal is this",
-                "what object is this",
-                "what plant is this",
-                "what insect is this"
-
-            ]
-
-
-            is_generic_image_question = any(
-
-                phrase
-                in question_lower
-
-                for phrase
-                in generic_image_questions
-
-            )
-
-
-            # ----------------------------------------------
-            # GENERIC IMAGE QUESTION
-            # ----------------------------------------------
-
-            if is_generic_image_question:
-
-                # Search ONLY the image label
-                #
-                # Example:
-                #
-                # lycaenid butterfly
-
-                research_query = vision
-
-                summary_question = vision
-
-
-            # ----------------------------------------------
-            # SPECIFIC IMAGE QUESTION
-            # ----------------------------------------------
-
-            else:
-
-                research_query = (
-                    question
-                    + " "
-                    + vision
+            except Exception as error:
+                print(
+                    "Groq Error:",
+                    error
                 )
-
-
-                summary_question = (
-                    question
-                    + " "
-                    + vision
-                )
-
-
-        print(
-            "RESEARCH QUERY:",
-            research_query
-        )
-
-
-        # ==================================================
-        # STEP 1
-        # ==================================================
-
-        research_results =research_question(
-                research_query
-            )
-
-
-        if not research_results:
-
-            return jsonify({
-
-                "answer":
-                    "I could not find enough reliable information for that question.",
-
-                "vision":
-                    vision,
-
-                "mode":
-                    "web",
-
-                "sources":
-                    []
-
-            })
-
-
-        # ==================================================
-        # STEP 2
-        # ==================================================
-
-        summary = summarize_research(
-
-                research_results,
-
-                summary_question,
-
-                3
-
-            )
-
-
-        # ==================================================
-        # SOURCES
-        # ==================================================
-
-        sources = [
-
-            item["url"]
-
-            for item
-            in research_results
-
-        ]
-
-
-        # ==================================================
-        # RETURN WEB RESULT
-        # ==================================================
 
         return jsonify({
-
-            "answer":
-                summary,
-
-            "vision":
-                vision,
-
-            "mode":
-                "web",
-
-            "sources":
-                sources,
-
-            "system":
-                "AI Pocket Scientist Research Engine"
-
-        })
-
+            "answer": "AI service is temporarily unavailable.",
+            "vision": vision
+        }), 503
 
     except Exception as error:
-
         print(
             "SERVER ERROR:",
             error
         )
 
-
         return jsonify({
-
-            "answer":
-                "Something went wrong while processing your question."
-
+            "answer": "Something went wrong while processing your question."
         }), 500
 
 
@@ -532,7 +284,6 @@ def ask():
 # ======================================================
 
 if __name__ == "__main__":
-
     app.run(
         debug=True
     )
