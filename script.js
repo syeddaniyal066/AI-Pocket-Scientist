@@ -137,71 +137,191 @@ function waitForImage(image) {
 // ANALYZE IMAGE
 // ======================================================
 
-async function analyzeImage() {
+async function askAI() {
 
-    if (!selectedImageBase64) {
-
-        return "";
+    if (isThinking) {
+        return;
     }
 
-    answerBox.textContent =
-        "👁️ Analyzing image...";
+    const question =
+        questionInput.value.trim();
 
-    await waitForImage(
-        previewImage
-    );
+    if (question === "") {
 
-    await loadVisionModel();
+        answerBox.textContent =
+            "⚠️ Please enter a question.";
 
-    const predictions =
-        await visionModel.classify(
-            previewImage
-        );
-
-    console.log(
-        "All vision predictions:",
-        predictions
-    );
-
-    if (
-        !predictions ||
-        predictions.length === 0
-    ) {
-
-        return "";
+        return;
     }
 
-    // Highest-confidence prediction
-    const bestPrediction =
-        predictions[0];
+    isThinking = true;
 
-    // Example:
-    // "lycaenid, lycaenid butterfly"
-    const names =
-        bestPrediction.className
-            .split(",")
-            .map(
-                name =>
-                    name.trim()
+    askButton.disabled = true;
+
+    questionInput.disabled = true;
+
+    try {
+
+        let visionDescription = "";
+
+        // ----------------------------------------------
+        // OPTIONAL MOBILENET BACKUP LABEL
+        // ----------------------------------------------
+
+        if (selectedImageBase64) {
+
+            try {
+
+                visionDescription =
+                    await analyzeImage();
+
+            } catch (visionError) {
+
+                console.error(
+                    "MobileNet Error:",
+                    visionError
+                );
+
+                visionDescription = "";
+            }
+        }
+
+
+        // ----------------------------------------------
+        // STATUS MESSAGE
+        // ----------------------------------------------
+
+        if (selectedImageBase64) {
+
+            answerBox.textContent =
+                "👁️ Reading image...";
+
+        } else {
+
+            answerBox.textContent =
+                "🤖 Asking AI...";
+        }
+
+
+        // ----------------------------------------------
+        // SEND QUESTION + ACTUAL IMAGE + BACKUP LABEL
+        // ----------------------------------------------
+
+        const response =
+            await fetch(
+                API_URL,
+                {
+
+                    method: "POST",
+
+                    headers: {
+
+                        "Content-Type":
+                            "application/json"
+                    },
+
+                    body:
+                        JSON.stringify({
+
+                            question:
+                                question,
+
+                            // Actual image for Groq Vision
+                            image:
+                                selectedImageBase64,
+
+                            // MobileNet label only as backup
+                            vision:
+                                visionDescription
+
+                        })
+                }
             );
 
-    // Pick most descriptive name
-    names.sort(
-        (a, b) =>
-            b.length - a.length
-    );
 
-    const bestLabel =
-        names[0];
+        // ----------------------------------------------
+        // READ RESPONSE
+        // ----------------------------------------------
 
-    console.log(
-        "Image contains:",
-        bestLabel
-    );
+        const data =
+            await response.json();
 
-    return bestLabel;
+
+        if (!response.ok) {
+
+            console.error(
+                "Server error:",
+                data
+            );
+
+            answerBox.textContent =
+                data.answer ||
+                "❌ Something went wrong.";
+
+            return;
+        }
+
+
+        if (data.answer) {
+
+            answerBox.textContent =
+                data.answer;
+
+        } else {
+
+            answerBox.textContent =
+                "⚠️ No answer received.";
+        }
+
+
+        // ----------------------------------------------
+        // DEBUG
+        // ----------------------------------------------
+
+        console.log(
+            "Image sent:",
+            selectedImageBase64
+                ? "YES"
+                : "NO"
+        );
+
+        console.log(
+            "MobileNet label:",
+            visionDescription
+        );
+
+        if (data.model) {
+
+            console.log(
+                "AI model:",
+                data.model
+            );
+        }
+
+    }
+
+    catch (error) {
+
+        console.error(
+            "Ask AI Error:",
+            error
+        );
+
+        answerBox.textContent =
+            "❌ Unable to connect to AI server.";
+    }
+
+    finally {
+
+        isThinking = false;
+
+        askButton.disabled = false;
+
+        questionInput.disabled = false;
+
+        questionInput.focus();
+    }
 }
-
 
 // ======================================================
 // ASK
