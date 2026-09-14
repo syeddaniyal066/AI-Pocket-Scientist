@@ -5,6 +5,8 @@ from flask import Flask, request, jsonify
 from flask_cors import CORS
 from dotenv import load_dotenv
 
+from openai import OpenAI
+
 try:
     from perplexity import Perplexity
 except Exception:
@@ -24,16 +26,40 @@ load_dotenv()
 
 PERPLEXITY_API_KEY = os.getenv("PERPLEXITY_API_KEY")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+DASHSCOPE_API_KEY = os.getenv("DASHSCOPE_API_KEY")
+
+
+# ======================================================
+# CLIENTS
+# ======================================================
 
 perplexity_client = (
-    Perplexity(api_key=PERPLEXITY_API_KEY)
+    Perplexity(
+        api_key=PERPLEXITY_API_KEY
+    )
     if Perplexity and PERPLEXITY_API_KEY
     else None
 )
 
+
 groq_client = (
-    Groq(api_key=GROQ_API_KEY)
+    Groq(
+        api_key=GROQ_API_KEY
+    )
     if Groq and GROQ_API_KEY
+    else None
+)
+
+
+qwen_client = (
+    OpenAI(
+        api_key=DASHSCOPE_API_KEY,
+        base_url=(
+            "https://dashscope-intl.aliyuncs.com/"
+            "compatible-mode/v1"
+        )
+    )
+    if DASHSCOPE_API_KEY
     else None
 )
 
@@ -46,9 +72,19 @@ app = Flask(__name__)
 
 CORS(
     app,
-    resources={r"/*": {"origins": "*"}},
-    allow_headers=["Content-Type"],
-    methods=["GET", "POST", "OPTIONS"]
+    resources={
+        r"/*": {
+            "origins": "*"
+        }
+    },
+    allow_headers=[
+        "Content-Type"
+    ],
+    methods=[
+        "GET",
+        "POST",
+        "OPTIONS"
+    ]
 )
 
 
@@ -58,6 +94,7 @@ CORS(
 
 @app.route("/")
 def home():
+
     return "AI Pocket Scientist Server Running!"
 
 
@@ -65,22 +102,10 @@ def home():
 # TEXT PROMPT
 # ======================================================
 
-def build_ai_prompt(question, vision=""):
-    image_context = ""
-
-    if vision:
-        image_context = f"""
-A local image recognition model identified the uploaded image as:
-{vision}
-
-Use this identification only as supporting context.
-Do not claim that you personally viewed the image.
-"""
+def build_ai_prompt(question):
 
     return f"""
 You are AI Pocket Scientist.
-
-{image_context}
 
 RULES:
 - Maximum 25 words.
@@ -100,41 +125,19 @@ Question:
 
 
 # ======================================================
-# VISION PROMPT
+# PERPLEXITY
 # ======================================================
 
-def build_vision_prompt(question):
-    return f"""
-You are AI Pocket Scientist.
+def ask_perplexity(question):
 
-Look at the uploaded image directly and answer the student's question about it.
-Identify visible objects, animals, plants, diagrams, text, or scientific details as accurately as possible.
-If the exact identity is uncertain, say "appears to be" instead of pretending to be certain.
-Do not mention MobileNet or any image label.
+    if not perplexity_client:
+        raise Exception(
+            "Perplexity is not configured."
+        )
 
-RULES:
-- Maximum 25 words.
-- Exactly 2 sentences.
-- No lists.
-- No headings.
-- No markdown.
-- No bullet points.
-- No introduction.
-- Use simple language for school students.
-- Answer the student's actual question.
-- Stop after the second sentence.
-
-Question:
-{question}
-"""
-
-
-# ======================================================
-# PERPLEXITY - TEXT
-# ======================================================
-
-def ask_perplexity(question, vision=""):
-    prompt = build_ai_prompt(question, vision)
+    prompt = build_ai_prompt(
+        question
+    )
 
     response = (
         perplexity_client
@@ -158,7 +161,7 @@ def ask_perplexity(question, vision=""):
         .content
     )
 
-    # Remove citation numbers such as [1], [2], etc.
+    # Remove Perplexity citation numbers
     answer = re.sub(
         r"\[\d+\]",
         "",
@@ -169,11 +172,19 @@ def ask_perplexity(question, vision=""):
 
 
 # ======================================================
-# GROQ - TEXT FALLBACK
+# GROQ TEXT FALLBACK
 # ======================================================
 
-def ask_groq_text(question, vision=""):
-    prompt = build_ai_prompt(question, vision)
+def ask_groq(question):
+
+    if not groq_client:
+        raise Exception(
+            "Groq is not configured."
+        )
+
+    prompt = build_ai_prompt(
+        question
+    )
 
     response = (
         groq_client
@@ -200,36 +211,73 @@ def ask_groq_text(question, vision=""):
 
 
 # ======================================================
-# GROQ - REAL IMAGE VISION
+# QWEN VISION
 # ======================================================
 
-def ask_groq_vision(question, image_data_url):
-    prompt = build_vision_prompt(question)
+def ask_qwen_vision(
+    question,
+    image_base64
+):
+
+    if not qwen_client:
+        raise Exception(
+            "Qwen is not configured."
+        )
+
+    prompt = f"""
+You are AI Pocket Scientist.
+
+Carefully examine the uploaded image.
+
+Answer the student's question using what you can actually
+see in the image.
+
+RULES:
+- Maximum 25 words.
+- Exactly 2 sentences.
+- No lists.
+- No headings.
+- No markdown.
+- Use simple language for school students.
+- Be specific about the image.
+- Do not invent details you cannot see.
+- Stop after the second sentence.
+
+Student question:
+{question}
+"""
 
     response = (
-        groq_client
+        qwen_client
         .chat
         .completions
         .create(
-            model="qwen/qwen3.6-27b",
+            model="qwen3-vl-plus",
+
             messages=[
                 {
                     "role": "user",
+
                     "content": [
                         {
                             "type": "text",
                             "text": prompt
                         },
+
                         {
                             "type": "image_url",
+
                             "image_url": {
-                                "url": image_data_url
+                                "url":
+                                    image_base64
                             }
                         }
                     ]
                 }
             ],
-            max_completion_tokens=150
+
+            temperature=0.2,
+            max_tokens=120
         )
     )
 
@@ -251,170 +299,198 @@ def ask_groq_vision(question, image_data_url):
     methods=["POST"]
 )
 def ask():
+
     try:
-        data = request.get_json(silent=True)
+
+        data = request.get_json(
+            silent=True
+        )
 
         if not data:
+
             return jsonify({
-                "answer": "No question received."
+                "answer":
+                    "No question received."
             }), 400
 
-        question = str(
-            data.get("question", "")
-        ).strip()
 
-        # Optional MobileNet label. Used only as a fallback.
-        vision = str(
-            data.get("vision", "")
-        ).strip()
+        question = (
+            data.get(
+                "question",
+                ""
+            )
+            .strip()
+        )
 
-        # Actual image as a browser-generated data URL.
-        image = str(
-            data.get("image", "")
-        ).strip()
+
+        image = (
+            data.get(
+                "image",
+                ""
+            )
+            .strip()
+        )
+
 
         if question == "":
+
             return jsonify({
-                "answer": "Please enter a question."
+                "answer":
+                    "Please enter a question."
             }), 400
 
-        if image and not image.startswith("data:image/"):
-            return jsonify({
-                "answer": "The uploaded image format is not supported."
-            }), 400
 
-        print("\n=================================")
-        print("QUESTION:", question)
-        print("IMAGE RECEIVED:", bool(image))
-        print("MOBILENET FALLBACK LABEL:", vision)
-        print("=================================")
+        print(
+            "================================="
+        )
 
-        if not perplexity_client and not groq_client:
-            return jsonify({
-                "answer": "AI service is not configured on this server."
-            }), 503
+        print(
+            "QUESTION:",
+            question
+        )
+
+        print(
+            "IMAGE:",
+            "YES"
+            if image
+            else "NO"
+        )
+
+        print(
+            "================================="
+        )
+
 
         # ==================================================
-        # IMAGE QUESTION: GROQ VISION FIRST
+        # IMAGE → QWEN
         # ==================================================
 
         if image:
-            if groq_client:
-                try:
-                    answer = ask_groq_vision(
-                        question,
-                        image
-                    )
 
-                    return jsonify({
-                        "answer": answer,
-                        "model": "Groq Vision",
-                        "vision_model": "qwen/qwen3.6-27b"
-                    })
+            try:
 
-                except Exception as error:
-                    print(
-                        "Groq Vision Error:",
-                        error
-                    )
+                print(
+                    "Using Qwen Vision..."
+                )
 
-            # If vision fails, use the old MobileNet label as backup.
-            if vision and perplexity_client:
-                try:
-                    answer = ask_perplexity(
-                        question,
-                        vision
-                    )
+                answer = ask_qwen_vision(
+                    question,
+                    image
+                )
 
-                    return jsonify({
-                        "answer": answer,
-                        "model": "Perplexity",
-                        "fallback": "MobileNet label"
-                    })
+                return jsonify({
 
-                except Exception as error:
-                    print(
-                        "Perplexity Image Fallback Error:",
-                        error
-                    )
+                    "answer":
+                        answer,
 
-            if vision and groq_client:
-                try:
-                    answer = ask_groq_text(
-                        question,
-                        vision
-                    )
+                    "model":
+                        "Qwen3-VL-Plus"
 
-                    return jsonify({
-                        "answer": answer,
-                        "model": "Groq Text",
-                        "fallback": "MobileNet label"
-                    })
+                })
 
-                except Exception as error:
-                    print(
-                        "Groq Image Fallback Error:",
-                        error
-                    )
+            except Exception as error:
+
+                print(
+                    "Qwen Vision Error:",
+                    error
+                )
+
+                return jsonify({
+
+                    "answer":
+                        "I could not read this image. Please try again.",
+
+                    "model":
+                        "Qwen Vision Error"
+
+                }), 500
+
+
+        # ==================================================
+        # TEXT → PERPLEXITY
+        # ==================================================
+
+        try:
+
+            print(
+                "Using Perplexity..."
+            )
+
+            answer = ask_perplexity(
+                question
+            )
 
             return jsonify({
-                "answer": "I could not analyze this image right now. Please try another image."
-            }), 503
+
+                "answer":
+                    answer,
+
+                "model":
+                    "Perplexity"
+
+            })
+
 
         # ==================================================
-        # TEXT QUESTION: PERPLEXITY FIRST
+        # FALLBACK → GROQ
         # ==================================================
 
-        if perplexity_client:
+        except Exception as error:
+
+            print(
+                "Perplexity Error:",
+                error
+            )
+
+
             try:
-                answer = ask_perplexity(
-                    question
-                )
 
-                return jsonify({
-                    "answer": answer,
-                    "model": "Perplexity"
-                })
-
-            except Exception as error:
                 print(
-                    "Perplexity Error:",
-                    error
+                    "Using Groq fallback..."
                 )
 
-        # ==================================================
-        # TEXT FALLBACK: GROQ
-        # ==================================================
-
-        if groq_client:
-            try:
-                answer = ask_groq_text(
+                answer = ask_groq(
                     question
                 )
 
                 return jsonify({
-                    "answer": answer,
-                    "model": "Groq"
+
+                    "answer":
+                        answer,
+
+                    "model":
+                        "Groq"
+
                 })
 
-            except Exception as error:
+
+            except Exception as groq_error:
+
                 print(
                     "Groq Error:",
-                    error
+                    groq_error
                 )
 
-        return jsonify({
-            "answer": "AI service is temporarily unavailable."
-        }), 503
+                return jsonify({
+
+                    "answer":
+                        "AI service is temporarily unavailable."
+
+                }), 503
+
 
     except Exception as error:
+
         print(
             "SERVER ERROR:",
             error
         )
 
         return jsonify({
-            "answer": "Something went wrong while processing your question."
+
+            "answer":
+                "Something went wrong while processing your question."
+
         }), 500
 
 
@@ -423,6 +499,7 @@ def ask():
 # ======================================================
 
 if __name__ == "__main__":
+
     app.run(
         debug=True
     )
