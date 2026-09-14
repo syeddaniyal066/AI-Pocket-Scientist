@@ -359,7 +359,7 @@ async function askAI() {
     try {
 
         // ----------------------------------------------
-        // STATUS
+        // STATUS MESSAGE
         // ----------------------------------------------
 
         if (selectedImageBase64) {
@@ -394,7 +394,7 @@ async function askAI() {
 
 
         // ----------------------------------------------
-        // SEND QUESTION + ACTUAL IMAGE
+        // SEND QUESTION + IMAGE
         // ----------------------------------------------
 
         const response =
@@ -405,7 +405,6 @@ async function askAI() {
                     method: "POST",
 
                     headers: {
-
                         "Content-Type":
                             "application/json"
                     },
@@ -417,10 +416,7 @@ async function askAI() {
                                 question,
 
                             image:
-                                selectedImageBase64,
-
-                            vision:
-                                ""
+                                selectedImageBase64
 
                         })
                 }
@@ -434,7 +430,7 @@ async function askAI() {
 
 
         // ----------------------------------------------
-        // RESPONSE
+        // READ SERVER RESPONSE
         // ----------------------------------------------
 
         const data =
